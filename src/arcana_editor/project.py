@@ -203,10 +203,11 @@ class ArcanaProject:
             x, y = position % MAP_WIDTH, position // MAP_WIDTH
             metadata = self.event_metadata.get(event_key(address, x, y), {})
             properties = metadata.get("properties")
-            if properties is None and event_kind(value) == "Coffre":
+            family = value & 0xF0
+            if properties is None and family == 0x80:
                 treasure = self.rom.treasure_at(entry_index, x, y)
                 properties = self.rom.treasure_properties(treasure) if treasure else default_properties(value)
-            if properties is None and event_kind(value) in ("Escalier", "Transition", "Porte / événement"):
+            if properties is None and family in (0x40, 0x50, 0x90):
                 stair = self.rom.stair_for_tile(entry_index, x, y)
                 properties = self.rom.stair_properties(stair) if stair else default_properties(value)
             events.append(MapEvent(

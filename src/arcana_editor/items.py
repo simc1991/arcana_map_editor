@@ -39,6 +39,29 @@ VENDORS = (
 )
 EQUIPMENT_CATEGORIES = {"Arme", "Armure", "Bouclier", "Accessoire"}
 
+CATEGORY_ENGLISH = {
+    "Objet": "Item",
+    "Arme": "Weapon",
+    "Armure": "Armor",
+    "Bouclier": "Shield",
+    "Accessoire": "Accessory",
+    "Carte": "Card",
+    "Monnaie": "Currency",
+}
+
+
+def category_display(category: str) -> str:
+    from .i18n import tr
+    return tr(CATEGORY_ENGLISH.get(category, category))
+
+
+def category_from_display(display: str) -> str:
+    from .i18n import tr
+    for french, english in CATEGORY_ENGLISH.items():
+        if tr(english) == display:
+            return french
+    return display
+
 
 @dataclass
 class GameItem:
@@ -66,7 +89,7 @@ class GameItem:
 
     @property
     def display(self) -> str:
-        return f"{self.name}  —  {self.category} #{self.item_id:02X}"
+        return f"{self.name}  —  {category_display(self.category)} #{self.item_id:02X}"
 
     @property
     def is_equipment(self) -> bool:

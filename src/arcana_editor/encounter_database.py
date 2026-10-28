@@ -5,6 +5,7 @@ from tkinter import messagebox, ttk
 from typing import Callable
 
 from .encounters import EncounterGroup
+from .i18n import tr
 from .project import ArcanaProject
 
 MAX_GROUP_ID = 0x0F
@@ -18,7 +19,7 @@ class EncounterDatabase(tk.Toplevel):
         self.current_key: tuple[int, int] | None = None
         self.chapter = tk.IntVar(value=1)
         self.zone = tk.IntVar(value=0)
-        self.title("Base de données — Groupes de rencontres")
+        self.title(tr("Database — Encounter groups"))
         self.geometry("900x600")
         self.minsize(760, 520)
         self.transient(parent)
@@ -29,8 +30,8 @@ class EncounterDatabase(tk.Toplevel):
     def _build(self) -> None:
         header = tk.Frame(self, background="#35475a", padx=16, pady=12)
         header.pack(fill="x")
-        tk.Label(header, text="BASE DE DONNÉES", background="#35475a", foreground="#9dd3ff", font=("Segoe UI", 9, "bold")).pack(anchor="w")
-        tk.Label(header, text="Groupes de rencontres", background="#35475a", foreground="#ffffff", font=("Segoe UI", 18, "bold")).pack(anchor="w")
+        tk.Label(header, text=tr("DATABASE"), background="#35475a", foreground="#9dd3ff", font=("Segoe UI", 9, "bold")).pack(anchor="w")
+        tk.Label(header, text=tr("Encounter groups"), background="#35475a", foreground="#ffffff", font=("Segoe UI", 18, "bold")).pack(anchor="w")
         body = ttk.Panedwindow(self, orient="horizontal")
         body.pack(fill="both", expand=True, padx=10, pady=10)
         left = ttk.Frame(body, padding=6)
@@ -39,15 +40,15 @@ class EncounterDatabase(tk.Toplevel):
         body.add(right, weight=2)
         chapter_row = ttk.Frame(left)
         chapter_row.pack(fill="x", pady=(0, 6))
-        ttk.Label(chapter_row, text="Chapitre").pack(side="left")
+        ttk.Label(chapter_row, text=tr("Chapter")).pack(side="left")
         chapter_box = ttk.Combobox(chapter_row, values=("1", "2", "3", "4", "5"), state="readonly", width=5)
         chapter_box.set("1")
         chapter_box.pack(side="left", padx=(6, 0))
         chapter_box.bind("<<ComboboxSelected>>", lambda _: self._chapter_changed(chapter_box.get()))
         self.tree = ttk.Treeview(left, columns=("zone", "enemies"), show="tree headings", selectmode="browse")
-        self.tree.heading("#0", text="Groupe")
-        self.tree.heading("zone", text="Zone")
-        self.tree.heading("enemies", text="Ennemis")
+        self.tree.heading("#0", text=tr("Group"))
+        self.tree.heading("zone", text=tr("Zone"))
+        self.tree.heading("enemies", text=tr("Enemies"))
         self.tree.column("#0", width=70)
         self.tree.column("zone", width=55, anchor="center")
         self.tree.column("enemies", width=220)
@@ -55,11 +56,11 @@ class EncounterDatabase(tk.Toplevel):
         self.tree.bind("<<TreeviewSelect>>", self._select_group)
         actions = ttk.Frame(left)
         actions.pack(fill="x", pady=(6, 0))
-        ttk.Button(actions, text="Nouveau groupe", command=self._new_group).pack(side="left", fill="x", expand=True)
-        ttk.Button(actions, text="Restaurer", command=self._restore_group).pack(side="left", fill="x", expand=True, padx=(4, 0))
-        ttk.Label(right, text="Zone de rencontre").grid(row=0, column=0, sticky="w")
+        ttk.Button(actions, text=tr("New group"), command=self._new_group).pack(side="left", fill="x", expand=True)
+        ttk.Button(actions, text=tr("Restore"), command=self._restore_group).pack(side="left", fill="x", expand=True, padx=(4, 0))
+        ttk.Label(right, text=tr("Encounter zone")).grid(row=0, column=0, sticky="w")
         ttk.Spinbox(right, from_=0, to=255, textvariable=self.zone, width=8).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        ttk.Label(right, text="Ennemis du groupe (1 à 15, Ctrl+clic pour sélectionner)").grid(row=1, column=0, columnspan=2, sticky="w", pady=(10, 4))
+        ttk.Label(right, text=tr("Group enemies (1 to 15, Ctrl+click to select)")).grid(row=1, column=0, columnspan=2, sticky="w", pady=(10, 4))
         list_frame = ttk.Frame(right)
         list_frame.grid(row=2, column=0, columnspan=2, sticky="nsew")
         self.enemy_list = tk.Listbox(list_frame, selectmode="multiple", exportselection=False, activestyle="none")
@@ -73,9 +74,9 @@ class EncounterDatabase(tk.Toplevel):
         right.columnconfigure(0, weight=1)
         footer = ttk.Frame(self, padding=(10, 0, 10, 10))
         footer.pack(fill="x")
-        ttk.Label(footer, text="Les groupes modifiés sont sauvegardés dans le projet et injectés lors de la construction du ROM.").pack(side="left")
-        ttk.Button(footer, text="Fermer", command=self.destroy).pack(side="right", padx=(6, 0))
-        ttk.Button(footer, text="Enregistrer le groupe", command=self._save_group).pack(side="right")
+        ttk.Label(footer, text=tr("Modified groups are saved to the project and injected when the ROM is built.")).pack(side="left")
+        ttk.Button(footer, text=tr("Close"), command=self.destroy).pack(side="right", padx=(6, 0))
+        ttk.Button(footer, text=tr("Save group"), command=self._save_group).pack(side="right")
 
     def _chapter_changed(self, value: str) -> None:
         self.chapter.set(int(value))
@@ -118,7 +119,7 @@ class EncounterDatabase(tk.Toplevel):
         used = {group.group_id for group in self.project.encounter_groups if group.chapter == chapter}
         free = next((group_id for group_id in range(MAX_GROUP_ID + 1) if group_id not in used), None)
         if free is None:
-            messagebox.showinfo("Aucun emplacement", "Ce chapitre possède déjà 16 groupes.", parent=self)
+            messagebox.showinfo(tr("No free slot"), tr("This chapter already has 16 groups."), parent=self)
             return
         self.current_key = None
         self.zone.set(0)
@@ -130,7 +131,7 @@ class EncounterDatabase(tk.Toplevel):
             used = {group.group_id for group in self.project.encounter_groups if group.chapter == chapter}
             group_id = next((candidate for candidate in range(MAX_GROUP_ID + 1) if candidate not in used), None)
             if group_id is None:
-                messagebox.showerror("Aucun emplacement", "Ce chapitre possède déjà 16 groupes.", parent=self)
+                messagebox.showerror(tr("No free slot"), tr("This chapter already has 16 groups."), parent=self)
                 return
         else:
             chapter, group_id = self.current_key
@@ -140,7 +141,7 @@ class EncounterDatabase(tk.Toplevel):
             group = EncounterGroup(chapter, group_id, int(self.zone.get()), enemy_ids, (), flags)
             self.project.save_encounter_group(group)
         except (ValueError, tk.TclError) as error:
-            messagebox.showerror("Groupe invalide", str(error), parent=self)
+            messagebox.showerror(tr("Invalid group"), str(error), parent=self)
             return
         self.current_key = (chapter, group_id)
         self._refresh_groups(self.current_key)

@@ -11,6 +11,7 @@ from .builder import build_rom
 from .dungeon_view import DIRECTION_NAMES, move_position, relative_position, tile_at
 from .event_editor import EventEditor
 from .events import MapEvent, default_properties
+from .i18n import FRENCH, ENGLISH, language, load_language, set_language, tr, translate
 from .encounter_database import EncounterDatabase
 from .item_database import ItemDatabase
 from .monster_database import MonsterDatabase
@@ -22,15 +23,18 @@ from .rendering import event_kind, is_walkable, tile_details, tile_style
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
 APP_TITLE = "Arcana Map Studio"
-APP_VERSION = "1.1"
-PALETTE = (
-    (0x00, "Mur / vide"), (0x10, "Rencontre A"), (0x11, "Rencontre B"),
-    (0x20, "Rencontre fréquente"), (0x30, "Sol sûr"), (0x40, "Escalier A"),
-    (0x41, "Escalier B"), (0x50, "Transition"), (0x60, "Brouillard"),
-    (0x63, "Brouillard spécial"), (0x65, "Tuile Reinoll"), (0x70, "Boss / événement"),
-    (0x80, "Coffre"), (0x90, "Porte / événement A"), (0x91, "Porte / événement B"),
-    (0x92, "Porte / événement C"),
-)
+APP_VERSION = "1.2"
+
+
+def _palette() -> tuple[tuple[int, str], ...]:
+    return (
+        (0x00, tr("Wall / empty")), (0x10, tr("Encounter A")), (0x11, tr("Encounter B")),
+        (0x20, tr("Frequent encounter")), (0x30, tr("Safe floor")), (0x40, tr("Stairs A")),
+        (0x41, tr("Stairs B")), (0x50, tr("Transition")), (0x60, tr("Fog")),
+        (0x63, tr("Special fog")), (0x65, tr("Reinoll tile")), (0x70, tr("Boss / event")),
+        (0x80, tr("Chest")), (0x90, tr("Door / event A")), (0x91, tr("Door / event B")),
+        (0x92, tr("Door / event C")),
+    )
 
 
 class ArcanaEditor(tk.Tk):
@@ -45,15 +49,15 @@ class ArcanaEditor(tk.Tk):
         self.zoom = tk.IntVar(value=24)
         self.show_grid = tk.BooleanVar(value=True)
         self.show_ids = tk.BooleanVar(value=False)
-        self.status = tk.StringVar(value="Ouvrez Arcana (USA).sfc pour commencer.")
-        self.map_info = tk.StringVar(value="Aucun projet")
-        self.selection_info = tk.StringVar(value="Aucune tuile sélectionnée")
+        self.status = tk.StringVar(value=tr("Open Arcana (USA).sfc to begin."))
+        self.map_info = tk.StringVar(value=tr("No project"))
+        self.selection_info = tk.StringVar(value=tr("No tile selected"))
         self.selected_x = 0
         self.selected_y = 0
         self.view_direction = 0
-        self.preview_info = tk.StringVar(value="Aperçu donjon")
+        self.preview_info = tk.StringVar(value=tr("Dungeon preview"))
         self.event_search = tk.StringVar()
-        self.event_count = tk.StringVar(value="0 événement")
+        self.event_count = tk.StringVar(value=tr("0 events"))
         self.drag_start: tuple[int, int] | None = None
         self.stroke_before: bytes | None = None
         self.undo_stack: deque[tuple[int, bytes, bytes]] = deque(maxlen=100)
@@ -85,38 +89,43 @@ class ArcanaEditor(tk.Tk):
     def _build_menu(self) -> None:
         menu = tk.Menu(self)
         file_menu = tk.Menu(menu, tearoff=False)
-        file_menu.add_command(label="Nouveau depuis un ROM…", accelerator="Ctrl+N", command=self.open_rom)
-        file_menu.add_command(label="Ouvrir un projet…", accelerator="Ctrl+O", command=self.open_project)
+        file_menu.add_command(label=tr("New from ROM…"), accelerator="Ctrl+N", command=self.open_rom)
+        file_menu.add_command(label=tr("Open a project…"), accelerator="Ctrl+O", command=self.open_project)
         file_menu.add_separator()
-        file_menu.add_command(label="Enregistrer", accelerator="Ctrl+S", command=self.save_project)
-        file_menu.add_command(label="Enregistrer sous…", accelerator="Ctrl+Shift+S", command=lambda: self.save_project(True))
+        file_menu.add_command(label=tr("Save"), accelerator="Ctrl+S", command=self.save_project)
+        file_menu.add_command(label=tr("Save as…"), accelerator="Ctrl+Shift+S", command=lambda: self.save_project(True))
         file_menu.add_separator()
-        file_menu.add_command(label="Construire un ROM modifié…", accelerator="Ctrl+B", command=self.export_rom)
-        file_menu.add_command(label="Exporter un patch IPS…", command=self.export_patch)
-        file_menu.add_command(label="Construire un exécutable PC…", command=self.export_pc_package)
+        file_menu.add_command(label=tr("Build a modified ROM…"), accelerator="Ctrl+B", command=self.export_rom)
+        file_menu.add_command(label=tr("Export an IPS patch…"), command=self.export_patch)
+        file_menu.add_command(label=tr("Build a PC executable…"), command=self.export_pc_package)
         file_menu.add_separator()
-        file_menu.add_command(label="Quitter", command=self._close)
+        file_menu.add_command(label=tr("Quit"), command=self._close)
         edit_menu = tk.Menu(menu, tearoff=False)
-        edit_menu.add_command(label="Annuler", accelerator="Ctrl+Z", command=self.undo)
-        edit_menu.add_command(label="Rétablir", accelerator="Ctrl+Y", command=self.redo)
+        edit_menu.add_command(label=tr("Undo"), accelerator="Ctrl+Z", command=self.undo)
+        edit_menu.add_command(label=tr("Redo"), accelerator="Ctrl+Y", command=self.redo)
         view_menu = tk.Menu(menu, tearoff=False)
-        view_menu.add_checkbutton(label="Afficher la grille", variable=self.show_grid, command=self._draw_map)
-        view_menu.add_checkbutton(label="Afficher les valeurs", variable=self.show_ids, command=self._draw_map)
+        view_menu.add_checkbutton(label=tr("Show grid"), variable=self.show_grid, command=self._draw_map)
+        view_menu.add_checkbutton(label=tr("Show values"), variable=self.show_ids, command=self._draw_map)
         view_menu.add_separator()
         for size, label in ((16, "50 %"), (24, "75 %"), (32, "100 %"), (48, "150 %"), (64, "200 %")):
             view_menu.add_radiobutton(label=label, variable=self.zoom, value=size, command=self._draw_map)
         database_menu = tk.Menu(menu, tearoff=False)
-        database_menu.add_command(label="Objets et équipements…", command=self.open_item_database)
-        database_menu.add_command(label="Groupes de rencontres…", command=self.open_encounter_database)
-        database_menu.add_command(label="Monstres…", command=self.open_monster_database)
-        database_menu.add_command(label="Sorts…", command=self.open_spell_database)
+        database_menu.add_command(label=tr("Items and equipment…"), command=self.open_item_database)
+        database_menu.add_command(label=tr("Encounter groups…"), command=self.open_encounter_database)
+        database_menu.add_command(label=tr("Monsters…"), command=self.open_monster_database)
+        database_menu.add_command(label=tr("Spells…"), command=self.open_spell_database)
+        language_menu = tk.Menu(menu, tearoff=False)
+        self.language_var = tk.StringVar(value=language())
+        for code, label in ((ENGLISH, "English"), (FRENCH, "Français")):
+            language_menu.add_radiobutton(label=label, variable=self.language_var, value=code, command=self._change_language)
         help_menu = tk.Menu(menu, tearoff=False)
-        help_menu.add_command(label="À propos", command=self._about)
-        menu.add_cascade(label="Fichier", menu=file_menu)
-        menu.add_cascade(label="Édition", menu=edit_menu)
-        menu.add_cascade(label="Base de données", menu=database_menu)
-        menu.add_cascade(label="Affichage", menu=view_menu)
-        menu.add_cascade(label="Aide", menu=help_menu)
+        help_menu.add_command(label=tr("About"), command=self._about)
+        menu.add_cascade(label=tr("File"), menu=file_menu)
+        menu.add_cascade(label=tr("Edit"), menu=edit_menu)
+        menu.add_cascade(label=tr("Database"), menu=database_menu)
+        menu.add_cascade(label=tr("View"), menu=view_menu)
+        menu.add_cascade(label=tr("Language"), menu=language_menu)
+        menu.add_cascade(label=tr("Help"), menu=help_menu)
         self.config(menu=menu)
 
     def _bind_shortcuts(self) -> None:
@@ -139,21 +148,21 @@ class ArcanaEditor(tk.Tk):
     def _build_ui(self) -> None:
         toolbar = ttk.Frame(self, style="Panel.TFrame", padding=(8, 7))
         toolbar.pack(fill="x")
-        ttk.Button(toolbar, text="Nouveau", command=self.open_rom, style="Tool.TButton").pack(side="left", padx=2)
-        ttk.Button(toolbar, text="Ouvrir", command=self.open_project, style="Tool.TButton").pack(side="left", padx=2)
-        ttk.Button(toolbar, text="Enregistrer", command=self.save_project, style="Tool.TButton").pack(side="left", padx=2)
-        ttk.Button(toolbar, text="Base de données", command=self.open_item_database, style="Tool.TButton").pack(side="left", padx=(8, 2))
-        ttk.Button(toolbar, text="Construire ROM", command=self.export_rom, style="Tool.TButton").pack(side="left", padx=(2, 14))
+        ttk.Button(toolbar, text=tr("New"), command=self.open_rom, style="Tool.TButton").pack(side="left", padx=2)
+        ttk.Button(toolbar, text=tr("Open"), command=self.open_project, style="Tool.TButton").pack(side="left", padx=2)
+        ttk.Button(toolbar, text=tr("Save"), command=self.save_project, style="Tool.TButton").pack(side="left", padx=2)
+        ttk.Button(toolbar, text=tr("Database"), command=self.open_item_database, style="Tool.TButton").pack(side="left", padx=(8, 2))
+        ttk.Button(toolbar, text=tr("Build ROM"), command=self.export_rom, style="Tool.TButton").pack(side="left", padx=(2, 14))
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=5)
         self.tool_buttons: dict[str, ttk.Button] = {}
-        for key, label in (("pencil", "Crayon (P)"), ("rectangle", "Rectangle (R)"), ("fill", "Remplir (F)"), ("picker", "Pipette (I)")):
+        for key, label in (("pencil", tr("Pencil (P)")), ("rectangle", tr("Rectangle (R)")), ("fill", tr("Fill (F)")), ("picker", tr("Picker (I)"))):
             button = ttk.Button(toolbar, text=label, command=lambda value=key: self._set_tool(value), style="Tool.TButton")
             button.pack(side="left", padx=2)
             self.tool_buttons[key] = button
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=10)
-        ttk.Button(toolbar, text="Annuler", command=self.undo, style="Tool.TButton").pack(side="left", padx=2)
-        ttk.Button(toolbar, text="Rétablir", command=self.redo, style="Tool.TButton").pack(side="left", padx=2)
-        ttk.Label(toolbar, text="Zoom", style="Panel.TLabel").pack(side="right", padx=(8, 3))
+        ttk.Button(toolbar, text=tr("Undo"), command=self.undo, style="Tool.TButton").pack(side="left", padx=2)
+        ttk.Button(toolbar, text=tr("Redo"), command=self.redo, style="Tool.TButton").pack(side="left", padx=2)
+        ttk.Label(toolbar, text=tr("Zoom"), style="Panel.TLabel").pack(side="right", padx=(8, 3))
         zoom = ttk.Scale(toolbar, from_=16, to=64, variable=self.zoom, command=self._zoom_changed, length=130)
         zoom.pack(side="right")
         self._set_tool("pencil")
@@ -175,17 +184,17 @@ class ArcanaEditor(tk.Tk):
         ttk.Label(status, text=f"Arcana Map Studio {APP_VERSION}", style="Panel.TLabel").pack(side="right")
 
     def _build_map_explorer(self, parent: ttk.Frame) -> None:
-        ttk.Label(parent, text="EXPLORATEUR", style="Title.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Label(parent, text=tr("EXPLORER"), style="Title.TLabel").pack(anchor="w", pady=(0, 8))
         self.map_tree = ttk.Treeview(parent, show="tree", selectmode="browse")
         self.map_tree.column("#0", width=220, minwidth=180)
         self.map_tree.pack(fill="both", expand=True)
         self.map_tree.bind("<<TreeviewSelect>>", self._tree_selected)
         ttk.Separator(parent).pack(fill="x", pady=8)
-        ttk.Label(parent, text="PALETTE", style="Title.TLabel").pack(anchor="w", pady=(0, 6))
+        ttk.Label(parent, text=tr("PALETTE"), style="Title.TLabel").pack(anchor="w", pady=(0, 6))
         palette_frame = ttk.Frame(parent, style="Panel.TFrame")
         palette_frame.pack(fill="x")
         self.palette_buttons: list[tk.Button] = []
-        for index, (value, name) in enumerate(PALETTE):
+        for index, (value, name) in enumerate(_palette()):
             style = tile_style(value)
             button = tk.Button(
                 palette_frame, text=f"{style.symbol or ' '}  {name}", anchor="w", width=24,
@@ -200,20 +209,20 @@ class ArcanaEditor(tk.Tk):
         self.hex_entry = ttk.Entry(custom, width=5)
         self.hex_entry.insert(0, "30")
         self.hex_entry.pack(side="left", padx=5)
-        ttk.Button(custom, text="Appliquer", command=self._choose_custom).pack(side="left")
+        ttk.Button(custom, text=tr("Apply"), command=self._choose_custom).pack(side="left")
 
     def _build_canvas(self, parent: ttk.Frame) -> None:
         header = ttk.Frame(parent, style="Panel.TFrame", padding=(10, 7))
         header.pack(fill="x")
         ttk.Label(header, textvariable=self.map_info, style="Title.TLabel").pack(side="left")
-        ttk.Checkbutton(header, text="Grille", variable=self.show_grid, command=self._draw_map).pack(side="right", padx=4)
-        ttk.Checkbutton(header, text="Valeurs", variable=self.show_ids, command=self._draw_map).pack(side="right", padx=4)
+        ttk.Checkbutton(header, text=tr("Grid"), variable=self.show_grid, command=self._draw_map).pack(side="right", padx=4)
+        ttk.Checkbutton(header, text=tr("Values"), variable=self.show_ids, command=self._draw_map).pack(side="right", padx=4)
         self.view_tabs = ttk.Notebook(parent)
         self.view_tabs.pack(fill="both", expand=True)
         map_tab = ttk.Frame(self.view_tabs)
         preview_tab = ttk.Frame(self.view_tabs, style="Panel.TFrame")
-        self.view_tabs.add(map_tab, text="Carte 2D")
-        self.view_tabs.add(preview_tab, text="Aperçu In-Game")
+        self.view_tabs.add(map_tab, text=tr("2D Map"))
+        self.view_tabs.add(preview_tab, text=tr("In-Game Preview"))
         self.view_tabs.bind("<<NotebookTabChanged>>", lambda _: self._draw_preview())
         self.canvas = tk.Canvas(map_tab, background="#11161d", highlightthickness=0)
         x_scroll = ttk.Scrollbar(map_tab, orient="horizontal", command=self.canvas.xview)
@@ -234,41 +243,41 @@ class ArcanaEditor(tk.Tk):
         preview_header = ttk.Frame(preview_tab, style="Panel.TFrame", padding=7)
         preview_header.pack(fill="x")
         ttk.Label(preview_header, textvariable=self.preview_info, style="Panel.TLabel").pack(side="left")
-        for label, action in (("Tourner gauche", lambda: self._preview_turn(-1)), ("Avancer", lambda: self._preview_move(1)), ("Reculer", lambda: self._preview_move(-1)), ("Tourner droite", lambda: self._preview_turn(1))):
+        for label, action in ((tr("Turn left"), lambda: self._preview_turn(-1)), (tr("Forward"), lambda: self._preview_move(1)), (tr("Backward"), lambda: self._preview_move(-1)), (tr("Turn right"), lambda: self._preview_turn(1))):
             ttk.Button(preview_header, text=label, command=action).pack(side="right", padx=2)
         self.preview_canvas = tk.Canvas(preview_tab, background="#080b10", highlightthickness=0)
         self.preview_canvas.pack(fill="both", expand=True)
         self.preview_canvas.bind("<Configure>", lambda _: self._draw_preview())
         self.preview_canvas.bind("<Button-1>", lambda _: self._preview_move(1))
-        ttk.Label(preview_tab, text="W/S : avancer/reculer   A/D : tourner   •   La position est synchronisée avec la carte 2D", style="Panel.TLabel", anchor="center", padding=5).pack(fill="x")
+        ttk.Label(preview_tab, text=tr("W/S: forward/backward   A/D: turn   •   Position is synchronized with the 2D map"), style="Panel.TLabel", anchor="center", padding=5).pack(fill="x")
 
     def _build_inspector(self, parent: ttk.Frame) -> None:
-        ttk.Label(parent, text="INSPECTEUR", style="Title.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Label(parent, text=tr("INSPECTOR"), style="Title.TLabel").pack(anchor="w", pady=(0, 8))
         tabs = ttk.Notebook(parent, width=285)
         tabs.pack(fill="both", expand=True)
         tile_tab = ttk.Frame(tabs, padding=9)
         event_tab = ttk.Frame(tabs, padding=9)
-        tabs.add(tile_tab, text="Tuile")
-        tabs.add(event_tab, text="Événements")
+        tabs.add(tile_tab, text=tr("Tile"))
+        tabs.add(event_tab, text=tr("Events"))
         ttk.Label(tile_tab, textvariable=self.selection_info, justify="left", wraplength=250).pack(anchor="w")
         ttk.Separator(tile_tab).pack(fill="x", pady=10)
-        ttk.Label(tile_tab, text="Type de gameplay").pack(anchor="w")
-        self.property_type = ttk.Combobox(tile_tab, state="readonly", values=[f"${value:02X} — {name}" for value, name in PALETTE])
+        ttk.Label(tile_tab, text=tr("Gameplay type")).pack(anchor="w")
+        self.property_type = ttk.Combobox(tile_tab, state="readonly", values=[f"${value:02X} — {name}" for value, name in _palette()])
         self.property_type.pack(fill="x", pady=5)
         self.property_type.bind("<<ComboboxSelected>>", self._property_changed)
-        ttk.Button(tile_tab, text="Appliquer à la tuile", command=self._apply_property).pack(fill="x", pady=5)
+        ttk.Button(tile_tab, text=tr("Apply to tile"), command=self._apply_property).pack(fill="x", pady=5)
         ttk.Separator(tile_tab).pack(fill="x", pady=10)
-        ttk.Label(tile_tab, text="Le rendu représente la logique du jeu : murs, sols, rencontres, passages, coffres et événements.", wraplength=250, justify="left").pack(anchor="w")
+        ttk.Label(tile_tab, text=tr("The rendering represents the game logic: walls, floors, encounters, passages, chests and events."), wraplength=250, justify="left").pack(anchor="w")
         search = ttk.Frame(event_tab)
         search.pack(fill="x", pady=(0, 7))
         ttk.Entry(search, textvariable=self.event_search).pack(side="left", fill="x", expand=True)
-        ttk.Button(search, text="Effacer", command=lambda: self.event_search.set("")).pack(side="left", padx=(4, 0))
+        ttk.Button(search, text=tr("Clear"), command=lambda: self.event_search.set("")).pack(side="left", padx=(4, 0))
         self.event_search.trace_add("write", lambda *_: self._refresh_events())
         columns = ("name", "type", "position")
         self.event_tree = ttk.Treeview(event_tab, columns=columns, show="headings", height=16)
-        self.event_tree.heading("name", text="Nom")
-        self.event_tree.heading("type", text="Type")
-        self.event_tree.heading("position", text="Position")
+        self.event_tree.heading("name", text=tr("Name"))
+        self.event_tree.heading("type", text=tr("Type"))
+        self.event_tree.heading("position", text=tr("Position"))
         self.event_tree.column("name", width=120)
         self.event_tree.column("type", width=80)
         self.event_tree.column("position", width=60, anchor="center")
@@ -278,18 +287,18 @@ class ArcanaEditor(tk.Tk):
         ttk.Label(event_tab, textvariable=self.event_count).pack(anchor="w", pady=(5, 3))
         buttons = ttk.Frame(event_tab)
         buttons.pack(fill="x")
-        ttk.Button(buttons, text="Nouveau", command=self._new_event).pack(side="left", fill="x", expand=True)
-        ttk.Button(buttons, text="Modifier", command=self._edit_selected_event).pack(side="left", fill="x", expand=True, padx=3)
-        ttk.Button(buttons, text="Dupliquer", command=self._duplicate_selected_event).pack(side="left", fill="x", expand=True)
-        ttk.Button(event_tab, text="Supprimer l’événement", command=self._delete_selected_event).pack(fill="x", pady=(4, 0))
-        ttk.Label(event_tab, text="Double-cliquez un événement pour ouvrir l’éditeur complet.", wraplength=250, justify="left").pack(anchor="w", pady=(8, 0))
+        ttk.Button(buttons, text=tr("New"), command=self._new_event).pack(side="left", fill="x", expand=True)
+        ttk.Button(buttons, text=tr("Edit"), command=self._edit_selected_event).pack(side="left", fill="x", expand=True, padx=3)
+        ttk.Button(buttons, text=tr("Duplicate"), command=self._duplicate_selected_event).pack(side="left", fill="x", expand=True)
+        ttk.Button(event_tab, text=tr("Delete event"), command=self._delete_selected_event).pack(fill="x", pady=(4, 0))
+        ttk.Label(event_tab, text=tr("Double-click an event to open the full editor."), wraplength=250, justify="left").pack(anchor="w", pady=(8, 0))
 
     def _set_tool(self, value: str) -> None:
         self.tool.set(value)
         for key, button in getattr(self, "tool_buttons", {}).items():
             button.configure(style="Selected.Tool.TButton" if key == value else "Tool.TButton")
-        names = {"pencil": "Crayon", "rectangle": "Rectangle", "fill": "Remplissage", "picker": "Pipette"}
-        self.status.set(f"Outil : {names[value]}")
+        names = {"pencil": tr("Pencil"), "rectangle": tr("Rectangle"), "fill": tr("Fill"), "picker": tr("Picker")}
+        self.status.set(tr("Tool:") + f" {names[value]}")
 
     def _open_default_rom(self) -> None:
         candidates = [Path.cwd() / "Arcana (USA).sfc"]
@@ -303,7 +312,7 @@ class ArcanaEditor(tk.Tk):
     def open_rom(self) -> None:
         if not self._discard_changes():
             return
-        path = filedialog.askopenfilename(title="Créer un projet depuis Arcana USA", filetypes=(("ROM SNES", "*.sfc *.smc"), ("Tous les fichiers", "*.*")))
+        path = filedialog.askopenfilename(title=tr("Create a project from Arcana USA"), filetypes=(("ROM SNES", "*.sfc *.smc"), ("Tous les fichiers", "*.*")))
         if path:
             self._load_rom(Path(path))
 
@@ -318,7 +327,7 @@ class ArcanaEditor(tk.Tk):
         self.undo_stack.clear()
         self.redo_stack.clear()
         self._populate_maps()
-        quality = "dump vérifié" if rom.info.is_known_dump else "dump compatible"
+        quality = tr("verified dump") if rom.info.is_known_dump else tr("compatible dump")
         self.status.set(f"{path.name} — CRC32 {rom.info.crc32:08X} — {quality}")
         self._refresh_all()
         self._update_title()
@@ -327,7 +336,7 @@ class ArcanaEditor(tk.Tk):
         self.map_tree.delete(*self.map_tree.get_children())
         if not self.project:
             return
-        groups = (("Chapitre 1", range(0, 2)), ("Chapitre 2", range(2, 5)), ("Chapitre 3", range(5, 8)), ("Chapitre 4", range(8, 22)), ("Chapitre 5", range(22, 34)))
+        groups = ((tr("Chapter 1"), range(0, 2)), (tr("Chapter 2"), range(2, 5)), (tr("Chapter 3"), range(5, 8)), (tr("Chapter 4"), range(8, 22)), (tr("Chapter 5"), range(22, 34)))
         for group, indices in groups:
             parent = self.map_tree.insert("", "end", text=group, open=True)
             for index in indices:
@@ -337,11 +346,11 @@ class ArcanaEditor(tk.Tk):
 
     def open_project(self) -> None:
         if not self.project:
-            messagebox.showinfo(APP_TITLE, "Ouvrez d’abord le ROM de base.", parent=self)
+            messagebox.showinfo(APP_TITLE, tr("Open the base ROM first."), parent=self)
             return
         if not self._discard_changes():
             return
-        path = filedialog.askopenfilename(title="Ouvrir un projet", filetypes=(("Projet Arcana", "*.arcana.json"), ("JSON", "*.json")))
+        path = filedialog.askopenfilename(title=tr("Open a project"), filetypes=((tr("Arcana project"), "*.arcana.json"), ("JSON", "*.json")))
         if not path:
             return
         try:
@@ -352,19 +361,19 @@ class ArcanaEditor(tk.Tk):
         self.undo_stack.clear()
         self.redo_stack.clear()
         self._refresh_all()
-        self.status.set(f"Projet ouvert : {path}")
+        self.status.set(tr("Project opened:") + f" {path}")
         self._update_title()
 
     def open_item_database(self) -> None:
         if not self.project:
-            messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
+            messagebox.showinfo(APP_TITLE, tr("Open a ROM or a project first."), parent=self)
             return
         ItemDatabase(self, self.project, self._item_database_changed)
 
     def _item_database_changed(self) -> None:
         self._refresh_events()
         self._update_title()
-        self.status.set(f"Base de données mise à jour — {len(self.project.items)} entrées disponibles")
+        self.status.set(tr("Database updated —") + f" {len(self.project.items)} " + tr("entries available"))
 
     def open_encounter_database(self) -> None:
         if not self.project:
@@ -375,7 +384,7 @@ class ArcanaEditor(tk.Tk):
     def _encounter_database_changed(self) -> None:
         self._refresh_events()
         self._update_title()
-        self.status.set(f"Groupes de rencontres mis à jour — {len(self.project.encounter_groups)} groupes disponibles")
+        self.status.set(tr("Encounter groups updated —") + f" {len(self.project.encounter_groups)} " + tr("groups available"))
 
     def open_monster_database(self) -> None:
         if not self.project:
@@ -386,7 +395,7 @@ class ArcanaEditor(tk.Tk):
     def _monster_database_changed(self) -> None:
         self._refresh_events()
         self._update_title()
-        self.status.set(f"Base de données monstres mise à jour — {len(self.project.enemies)} entrées disponibles")
+        self.status.set(tr("Monster database updated —") + f" {len(self.project.enemies)} " + tr("entries available"))
 
     def open_spell_database(self) -> None:
         if not self.project:
@@ -397,16 +406,16 @@ class ArcanaEditor(tk.Tk):
     def _spell_database_changed(self) -> None:
         self._refresh_events()
         self._update_title()
-        self.status.set(f"Base de données sorts mise à jour — {len(self.project.spells)} entrées disponibles")
+        self.status.set(tr("Spell database updated —") + f" {len(self.project.spells)} " + tr("entries available"))
 
     def export_patch(self) -> None:
         if not self.project:
             messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
             return
         destination = filedialog.asksaveasfilename(
-            title="Exporter un patch IPS",
+            title=tr("Export an IPS patch"),
             defaultextension=".ips",
-            filetypes=(("Patch IPS", "*.ips"), ("Tous les fichiers", "*.*")),
+            filetypes=((tr("IPS patch"), "*.ips"), (tr("All files"), "*.*")),
             parent=self,
         )
         if not destination:
@@ -422,16 +431,16 @@ class ArcanaEditor(tk.Tk):
             patch = build_ips_patch(self.project.rom.data, patched)
             Path(destination).write_bytes(patch)
         except RomError as error:
-            messagebox.showerror("Export impossible", str(error), parent=self)
+            messagebox.showerror(tr("Export failed"), str(error), parent=self)
             return
-        self.status.set(f"Patch IPS exporté : {Path(destination).name} ({len(patch)} octets) — {report.warnings and 'avertissements : ' + '; '.join(report.warnings) or 'aucun avertissement'}")
+        self.status.set(tr("IPS patch exported:") + f" {Path(destination).name} ({len(patch)} " + tr("bytes") + ") — {report.warnings and tr('warnings:') + ' ' + '; '.join(report.warnings) or tr('no warnings')}")
 
     def export_pc_package(self) -> None:
         if not self.project:
             messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
             return
         destination = filedialog.askdirectory(
-            title="Dossier de destination du package PC",
+            title=tr("PC package destination folder"),
             parent=self,
         )
         if not destination:
@@ -439,25 +448,25 @@ class ArcanaEditor(tk.Tk):
         try:
             folder, report = build_pc_package(self.project, Path(destination) / "Arcana-PC")
         except RomError as error:
-            messagebox.showerror("Package impossible", str(error), parent=self)
+            messagebox.showerror(tr("Package failed"), str(error), parent=self)
             return
-        warnings = f"\n\nAvertissements :\n" + "\n".join(report.warnings) if report.warnings else ""
+        warnings = "\n\n" + tr("Warnings:") + "\n" + "\n".join(report.warnings) if report.warnings else ""
         messagebox.showinfo(
-            "Package PC créé",
-            f"Dossier : {folder}\n\n"
-            "Double-cliquez sur Jouer.bat pour lancer le jeu.\n"
-            "Attention : ce package contient une copie du jeu — ne le partagez qu'avec des propriétaires de l'original."
+            tr("PC package created"),
+            tr("Folder:") + f" {folder}\n\n"
+            + tr("Double-click Jouer.bat to launch the game.") + "\n"
+            + tr("Warning: this package contains a copy of the game — only share it with owners of the original.")
             + warnings,
             parent=self,
         )
-        self.status.set(f"Package PC créé dans {folder.name}")
+        self.status.set(tr("PC package created in") + f" {folder.name}")
 
     def export_rom(self) -> None:
         if not self.project:
             messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
             return
         destination = filedialog.asksaveasfilename(
-            title="Construire un ROM modifié",
+            title=tr("Build a modified ROM"),
             defaultextension=".sfc",
             initialfile="Arcana (Mod).sfc",
             filetypes=(("ROM SNES", "*.sfc"),),
@@ -467,32 +476,32 @@ class ArcanaEditor(tk.Tk):
         try:
             report = build_rom(self.project, destination)
         except (OSError, RomError) as error:
-            messagebox.showerror("Construction impossible", str(error), parent=self)
+            messagebox.showerror(tr("Build failed"), str(error), parent=self)
             return
         details = (
-            f"ROM construit et vérifié avec succès.\n\n"
-            f"Cartes injectées : {report.maps_written}\n"
-            f"Données compressées : {report.compressed_bytes} / {report.available_bytes} octets\n"
-            f"Coffres injectés : {report.treasures_written}\n"
-            f"Escaliers injectés : {report.stairs_written}\n"
-            f"Objets injectés : {report.items_written}\n"
-            f"Objets en boutique : {report.shop_slots_written}\n"
-            f"Groupes de rencontres : {report.encounters_written}\n"
-            f"Monstres injectés : {report.enemies_written}\n"
-            f"Checksum SNES : ${report.checksum:04X}\n\n"
-            f"Fichier : {report.output_path}"
+            tr("ROM built and verified successfully.") + "\n\n"
+            + tr("Maps injected:") + f" {report.maps_written}\n"
+            + tr("Compressed data:") + f" {report.compressed_bytes} / {report.available_bytes} " + tr("bytes") + "\n"
+            + tr("Chests injected:") + f" {report.treasures_written}\n"
+            + tr("Stairs injected:") + f" {report.stairs_written}\n"
+            + tr("Items injected:") + f" {report.items_written}\n"
+            + tr("Shop items:") + f" {report.shop_slots_written}\n"
+            + tr("Encounter groups:") + f" {report.encounters_written}\n"
+            + tr("Monsters injected:") + f" {report.enemies_written}\n"
+            + tr("SNES checksum:") + f" ${report.checksum:04X}\n\n"
+            + tr("File:") + f" {report.output_path}"
         )
         if report.warnings:
-            details += "\n\nAvertissements :\n- " + "\n- ".join(report.warnings)
-        messagebox.showinfo("Construction terminée", details, parent=self)
-        self.status.set(f"ROM construit : {report.output_path.name}")
+            details += "\n\n" + tr("Warnings:") + "\n- " + "\n- ".join(report.warnings)
+        messagebox.showinfo(tr("Build complete"), details, parent=self)
+        self.status.set(tr("ROM built:") + f" {report.output_path.name}")
 
     def save_project(self, save_as: bool = False) -> None:
         if not self.project:
             return
         path = self.project.path
         if save_as or path is None:
-            selected = filedialog.asksaveasfilename(title="Enregistrer le projet", defaultextension=".arcana.json", filetypes=(("Projet Arcana", "*.arcana.json"),))
+            selected = filedialog.asksaveasfilename(title=tr("Save the project"), defaultextension=".arcana.json", filetypes=((tr("Arcana project"), "*.arcana.json"),))
             if not selected:
                 return
             path = Path(selected)
@@ -501,7 +510,7 @@ class ArcanaEditor(tk.Tk):
         except OSError as error:
             messagebox.showerror(APP_TITLE, str(error), parent=self)
             return
-        self.status.set(f"Projet enregistré : {path}")
+        self.status.set(tr("Project saved:") + f" {path}")
         self._update_title()
 
     def _tree_selected(self, _: object = None) -> None:
@@ -527,7 +536,7 @@ class ArcanaEditor(tk.Tk):
                 self._draw_tile(x, y, tiles[y * MAP_WIDTH + x])
         entry = self.project.rom.maps[self.entry_index]
         aliases = [item.name for item in self.project.rom.maps if item.snes_address == entry.snes_address]
-        shared = f" • bloc partagé par {len(aliases)} étages" if len(aliases) > 1 else ""
+        shared = tr(" • block shared by") + f" {len(aliases)} " + tr("floors") if len(aliases) > 1 else ""
         self.map_info.set(f"{entry.name}   |   32 × 32{shared}")
         self._draw_selection()
 
@@ -667,7 +676,7 @@ class ArcanaEditor(tk.Tk):
             return
         value = self.project.map_for_entry(self.entry_index)[y * MAP_WIDTH + x]
         self._select_palette(value)
-        self.status.set(f"Pipette : ${value:02X} à ({x}, {y})")
+        self.status.set(tr("Picker:") + f" ${value:02X} " + tr("at") + f" ({x}, {y})")
 
     def _select_tile(self, x: int, y: int) -> None:
         if not self.project or not self._valid_xy(x, y):
@@ -675,8 +684,8 @@ class ArcanaEditor(tk.Tk):
         self.selected_x, self.selected_y = x, y
         value = self.project.map_for_entry(self.entry_index)[y * MAP_WIDTH + x]
         style = tile_style(value)
-        self.selection_info.set(f"Position : X {x:02d}, Y {y:02d}\nValeur : ${value:02X}\nType : {style.name}\nCatégorie : {style.category}\n\n{tile_details(value)}")
-        matching = next((index for index, (candidate, _) in enumerate(PALETTE) if candidate == value), -1)
+        self.selection_info.set(tr("Position:") + f" X {x:02d}, Y {y:02d}\n" + tr("Value:") + f" ${value:02X}\n" + tr("Type:") + f" {style.name}\n" + tr("Category:") + f" {style.category}\n\n{tile_details(value)}")
+        matching = next((index for index, (candidate, _) in enumerate(_palette()) if candidate == value), -1)
         self.property_type.current(matching)
         self._draw_selection()
         self._draw_preview()
@@ -684,15 +693,15 @@ class ArcanaEditor(tk.Tk):
     def _refresh_events(self) -> None:
         self.event_tree.delete(*self.event_tree.get_children())
         if not self.project:
-            self.event_count.set("0 événement")
+            self.event_count.set(tr("0 events"))
             return
         query = self.event_search.get().strip().casefold()
         events = self.project.events_for_entry(self.entry_index)
         visible = [event for event in events if not query or query in f"{event.display_name} {event.kind} {event.x} {event.y}".casefold()]
         for event in visible:
             self.event_tree.insert("", "end", iid=f"event-{event.x}-{event.y}", values=(event.display_name, event.kind, f"{event.x}, {event.y}"))
-        suffix = "événement" if len(events) == 1 else "événements"
-        filtered = f" — {len(visible)} affiché(s)" if len(visible) != len(events) else ""
+        suffix = tr("event") if len(events) == 1 else tr("events")
+        filtered = " — " + str(len(visible)) + " " + tr("shown") if len(visible) != len(events) else ""
         self.event_count.set(f"{len(events)} {suffix}{filtered}")
 
     def _event_selected(self, _: object = None) -> None:
@@ -724,7 +733,7 @@ class ArcanaEditor(tk.Tk):
     def _edit_selected_event(self) -> None:
         event = self._selected_event()
         if not event:
-            messagebox.showinfo(APP_TITLE, "Sélectionnez d’abord un événement dans la liste ou sur la carte.", parent=self)
+            messagebox.showinfo(APP_TITLE, tr("Select an event in the list or on the map first."), parent=self)
             return
         EventEditor(self, event, self._save_edited_event, self.project.items, self.project.encounters_for_map(self.entry_index), tuple((entry.index, entry.name) for entry in self.project.rom.maps))
 
@@ -734,7 +743,7 @@ class ArcanaEditor(tk.Tk):
         try:
             self.project.update_event(self.entry_index, event, old_x, old_y)
         except ValueError as error:
-            messagebox.showerror("Impossible d’enregistrer", str(error), parent=self)
+            messagebox.showerror(tr("Cannot save"), str(error), parent=self)
             return
         self.selected_x, self.selected_y = event.x, event.y
         self._refresh_all()
@@ -743,32 +752,32 @@ class ArcanaEditor(tk.Tk):
         if self.event_tree.exists(iid):
             self.event_tree.selection_set(iid)
             self.event_tree.see(iid)
-        self.status.set(f"Événement enregistré : {event.display_name}")
+        self.status.set(tr("Event saved:") + f" {event.display_name}")
 
     def _duplicate_selected_event(self) -> None:
         event = self._selected_event()
         if not event or not self.project:
-            messagebox.showinfo(APP_TITLE, "Sélectionnez l’événement à dupliquer.", parent=self)
+            messagebox.showinfo(APP_TITLE, tr("Select the event to duplicate."), parent=self)
             return
         x, y = self._find_free_event_position(event.x + 1, event.y)
-        duplicate = MapEvent(event.map_address, x, y, event.value, f"{event.display_name} — copie", event.notes, dict(event.properties))
+        duplicate = MapEvent(event.map_address, x, y, event.value, event.display_name + " — " + tr("copy"), event.notes, dict(event.properties))
         self.project.update_event(self.entry_index, duplicate, x, y)
         self.selected_x, self.selected_y = x, y
         self._refresh_all()
         self._update_title()
-        self.status.set(f"Événement dupliqué en ({x}, {y})")
+        self.status.set(tr("Event duplicated at") + f" ({x}, {y})")
 
     def _delete_selected_event(self) -> None:
         event = self._selected_event()
         if not event or not self.project:
-            messagebox.showinfo(APP_TITLE, "Sélectionnez l’événement à supprimer.", parent=self)
+            messagebox.showinfo(APP_TITLE, tr("Select the event to delete."), parent=self)
             return
-        if not messagebox.askyesno("Supprimer l’événement", f"Supprimer « {event.display_name} » ?\nLa case deviendra un sol sûr.", parent=self):
+        if not messagebox.askyesno(tr("Delete event"), tr("Delete") + f" « {event.display_name} » ?\n" + tr("The tile will become safe floor."), parent=self):
             return
         self.project.remove_event(self.entry_index, event.x, event.y)
         self._refresh_all()
         self._update_title()
-        self.status.set("Événement supprimé.")
+        self.status.set(tr("Event deleted."))
 
     def _find_free_event_position(self, start_x: int, start_y: int) -> tuple[int, int]:
         if not self.project:
@@ -778,12 +787,12 @@ class ArcanaEditor(tk.Tk):
             x, y = position % MAP_WIDTH, position // MAP_WIDTH
             if self.project.event_at(self.entry_index, x, y) is None:
                 return x, y
-        raise ValueError("La carte ne contient plus d’emplacement libre")
+        raise ValueError(tr("The map has no free position left"))
 
     def _property_changed(self, _: object = None) -> None:
         index = self.property_type.current()
         if index >= 0:
-            self._select_palette(PALETTE[index][0])
+            self._select_palette(_palette()[index][0])
 
     def _apply_property(self) -> None:
         if not self.project:
@@ -801,7 +810,7 @@ class ArcanaEditor(tk.Tk):
         self.tile_value.set(value)
         self.hex_entry.delete(0, "end")
         self.hex_entry.insert(0, f"{value:02X}")
-        self.status.set(f"Tuile active : ${value:02X} — {tile_style(value).name}")
+        self.status.set(tr("Active tile:") + f" ${value:02X} — {tile_style(value).name}")
 
     def _choose_custom(self) -> None:
         try:
@@ -809,7 +818,7 @@ class ArcanaEditor(tk.Tk):
             if not 0 <= value <= 0xFF:
                 raise ValueError
         except ValueError:
-            messagebox.showerror(APP_TITLE, "Entrez une valeur hexadécimale de 00 à FF.", parent=self)
+            messagebox.showerror(APP_TITLE, tr("Enter a hexadecimal value from 00 to FF."), parent=self)
             return
         self._select_palette(value)
 
@@ -875,7 +884,7 @@ class ArcanaEditor(tk.Tk):
             self._select_tile(x, y)
             self._draw_preview()
         else:
-            self.status.set("Un mur bloque le passage.")
+            self.status.set(tr("A wall blocks the way."))
 
     def _draw_preview(self) -> None:
         if not hasattr(self, "preview_canvas"):
@@ -887,7 +896,7 @@ class ArcanaEditor(tk.Tk):
         canvas.create_rectangle(0, 0, width, height / 2, fill="#17202b", outline="")
         canvas.create_rectangle(0, height / 2, width, height, fill="#302c28", outline="")
         if not self.project:
-            canvas.create_text(width / 2, height / 2, text="Ouvrez un ROM pour afficher le donjon", fill="#d8dee9", font=("Segoe UI", 16))
+            canvas.create_text(width / 2, height / 2, text=tr("Open a ROM to display the dungeon"), fill="#d8dee9", font=("Segoe UI", 16))
             return
         tiles = self.project.map_for_entry(self.entry_index)
         frames = []
@@ -930,7 +939,8 @@ class ArcanaEditor(tk.Tk):
                 canvas.create_text((inner[0] + inner[2]) / 2, (inner[1] + inner[3]) / 2, text=style.symbol or "◆", fill=style.accent, font=("Segoe UI Symbol", scale, "bold"))
                 canvas.create_text((inner[0] + inner[2]) / 2, inner[3] - 18, text=style.name, fill="#f4f1e8", font=("Segoe UI", max(8, scale // 3), "bold"))
         current = tile_at(tiles, self.selected_x, self.selected_y)
-        self.preview_info.set(f"X {self.selected_x:02d}  Y {self.selected_y:02d}  •  {DIRECTION_NAMES[self.view_direction]}  •  {tile_style(current).name}")
+        from .dungeon_view import _direction_names
+        self.preview_info.set(f"X {self.selected_x:02d}  Y {self.selected_y:02d}  •  {_direction_names()[self.view_direction]}  •  {tile_style(current).name}")
         canvas.create_text(16, 16, text=self.project.rom.maps[self.entry_index].name, fill="#ffffff", anchor="nw", font=("Segoe UI", 14, "bold"))
 
     def _draw_preview_bricks(self, frame: tuple[float, float, float, float]) -> None:
@@ -953,7 +963,7 @@ class ArcanaEditor(tk.Tk):
     def _discard_changes(self) -> bool:
         if not self.project or not self.project.dirty:
             return True
-        answer = messagebox.askyesnocancel(APP_TITLE, "Enregistrer les modifications avant de continuer ?", parent=self)
+        answer = messagebox.askyesnocancel(APP_TITLE, tr("Save changes before continuing?"), parent=self)
         if answer is None:
             return False
         if answer:
@@ -969,8 +979,15 @@ class ArcanaEditor(tk.Tk):
                 suffix += " *"
         self.title(f"{APP_TITLE} {APP_VERSION}{suffix}")
 
+    def _change_language(self) -> None:
+        selected = self.language_var.get()
+        if selected == language():
+            return
+        set_language(selected)
+        messagebox.showinfo(tr("Restart required"), tr("The language will be applied at the next launch."), parent=self)
+
     def _about(self) -> None:
-        messagebox.showinfo(APP_TITLE, f"Arcana Map Studio {APP_VERSION}\nÉditeur visuel non officiel pour Arcana USA (SNES).\n\nRendu WYSIWYG logique, cartes, rencontres, transitions, coffres et événements.", parent=self)
+        messagebox.showinfo(APP_TITLE, f"Arcana Map Studio {APP_VERSION}\n" + tr("Unofficial visual editor for Arcana USA (SNES).") + "\n\n" + tr("WYSIWYG logical rendering, maps, encounters, transitions, chests and events."), parent=self)
 
     def _close(self) -> None:
         if self._discard_changes():
@@ -978,4 +995,5 @@ class ArcanaEditor(tk.Tk):
 
 
 def main() -> None:
+    load_language()
     ArcanaEditor().mainloop()

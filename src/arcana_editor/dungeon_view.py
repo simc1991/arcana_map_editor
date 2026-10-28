@@ -4,7 +4,12 @@ from dataclasses import dataclass
 
 from .rom import MAP_HEIGHT, MAP_WIDTH
 
-DIRECTION_NAMES = ("Nord", "Est", "Sud", "Ouest")
+def _direction_names() -> tuple[str, ...]:
+    from .i18n import tr
+    return (tr("North"), tr("East"), tr("South"), tr("West"))
+
+
+DIRECTION_NAMES = _direction_names()
 DIRECTION_VECTORS = ((0, -1), (1, 0), (0, 1), (-1, 0))
 
 

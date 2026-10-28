@@ -2,18 +2,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .i18n import tr
 from .rendering import event_kind, tile_details
 
 EVENT_TYPES = {
-    "Rencontre": 0x10,
-    "Rencontre +": 0x20,
-    "Escalier": 0x40,
+    "Encounter": 0x10,
+    "Encounter +": 0x20,
+    "Stairs": 0x40,
     "Transition": 0x50,
-    "Brouillard": 0x60,
-    "Événement": 0x70,
-    "Coffre": 0x80,
-    "Porte / événement": 0x90,
+    "Fog": 0x60,
+    "Event": 0x70,
+    "Chest": 0x80,
+    "Door / event": 0x90,
 }
+
+
+def event_types() -> dict[str, int]:
+    return {tr(name): value for name, value in EVENT_TYPES.items()}
 
 
 @dataclass
@@ -28,7 +33,7 @@ class MapEvent:
 
     @property
     def kind(self) -> str:
-        return event_kind(self.value) or "Événement"
+        return event_kind(self.value) or tr("Event")
 
     @property
     def key(self) -> str:
@@ -52,16 +57,16 @@ def default_event_name(kind: str, x: int, y: int) -> str:
 
 
 def default_properties(value: int) -> dict[str, str | int]:
-    kind = event_kind(value)
+    family = value & 0xF0
     variant = value & 0x0F
-    if kind in ("Rencontre", "Rencontre +"):
-        return {"groupe": variant, "fréquence": "1/4" if kind == "Rencontre +" else "1/12"}
-    if kind == "Coffre":
+    if family in (0x10, 0x20):
+        return {"groupe": variant, "fréquence": "1/4" if family == 0x20 else "1/12"}
+    if family == 0x80:
         return {"contenu": "À identifier", "quantité": 1}
-    if kind in ("Escalier", "Transition"):
+    if family in (0x40, 0x50):
         return {"destination": "À définir", "x_cible": 0, "y_cible": 0, "direction": "Nord"}
-    if kind in ("Événement", "Porte / événement"):
+    if family in (0x70, 0x90):
         return {"déclenchement": "Contact joueur", "condition": "Aucune"}
-    if kind == "Brouillard":
+    if family == 0x60:
         return {"intensité": variant}
     return {}

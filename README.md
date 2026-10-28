@@ -4,7 +4,7 @@ Open source map editor and analysis tools for **Arcana (USA)** on the Super Nint
 
 ## Current state
 
-Version `1.0` provides:
+Version `1.2` provides:
 
 - validation of the Arcana USA LoROM dump, with or without a 512-byte copier header;
 - SNES header reading, SHA-256 and CRC32;
@@ -60,6 +60,7 @@ Version `1.0` provides:
 - PNG/GIF to SNES conversion (v1.0): an imported monster image is quantized to 15 colors, converted to 4bpp tiles with a generated OAM frame, recompressed and injected in place when it fits the original graphics slot;
 - IPS patch export (v1.0): `File > Export an IPS patch` writes a standard `.ips` patch of the rebuilt ROM so mods can be shared without distributing the ROM;
 - PC package export (v1.1): `File > Build a PC executable` produces an `Arcana-PC/` folder bundling your emulator (`tools/snes9x-x64.exe` or any path), the rebuilt ROM and a one-click `Jouer.bat` launcher — play on PC without configuring an emulator;
+- bilingual UI (v1.2): the application runs in English by default, with a `Language` menu to switch to French (preference persisted, applied on restart);
 - a standalone Windows executable built with PyInstaller.
 
 The second roadmap milestone is underway: grid-carried interactive elements are now visible and editable. Editing their associated detailed tables — exact chest contents, stair destinations and enemy formations — remains to be completed. Injecting into a new ROM still requires safe recompression and patch export.

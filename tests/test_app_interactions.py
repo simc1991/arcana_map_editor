@@ -5,8 +5,11 @@ import pytest
 
 from arcana_editor.app import ArcanaEditor
 from arcana_editor.event_editor import EventEditor
+from arcana_editor.i18n import ENGLISH, set_language
 
 ROM = Path(__file__).parents[1] / "Arcana (USA).sfc"
+
+set_language(ENGLISH)
 
 
 @pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
@@ -20,7 +23,7 @@ def test_event_editor_and_chest_picker_interactions() -> None:
         purple_pointer = SimpleNamespace(x=2, y=2)
         app._canvas_press(purple_pointer)
         assert app.project.map_for_entry(0)[0] == 0x90
-        assert app.project.event_at(0, 0, 0).kind == "Porte / événement"
+        assert app.project.event_at(0, 0, 0).kind == "Door / event"
         found = app.project.events_for_entry(0)[0]
         before = app.project.map_for_entry(0)[found.y * 32 + found.x]
         pointer = SimpleNamespace(x=found.x * app.tile_size + 2, y=found.y * app.tile_size + 2)
@@ -31,7 +34,7 @@ def test_event_editor_and_chest_picker_interactions() -> None:
         app.update_idletasks()
         dialogs = [widget for widget in app.winfo_children() if widget.winfo_class() == "Toplevel"]
         assert len(dialogs) == 1
-        assert "Éditeur d’événement" in dialogs[0].title()
+        assert "Event editor" in dialogs[0].title()
         dialogs[0].destroy()
         chest = app.project.event_at(0, 7, 2)
         assert chest is not None
