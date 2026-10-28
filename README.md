@@ -4,7 +4,7 @@ Open source map editor and analysis tools for **Arcana (USA)** on the Super Nint
 
 ## Current state
 
-Version `0.9` provides:
+Version `1.0` provides:
 
 - validation of the Arcana USA LoROM dump, with or without a 512-byte copier header;
 - SNES header reading, SHA-256 and CRC32;
@@ -51,11 +51,14 @@ Version `0.9` provides:
 - reconstruction and relocation of the 5 Outfitter shop inventories in bank `$03`;
 - reconstruction and relocation of the 5 encounter group tables in bank `$18`;
 - a monster database with per-enemy stats: HP, EXP, GP, level, STR/INT/END/ALERT, race, element, attack animation, equipped defenses and spell;
-- monster image loading (PNG/GIF) with in-editor preview, stored in the project for the future SNES tile conversion;
+- monster image loading (PNG/GIF) with in-editor preview and ROM injection via tile conversion;
 - import of the 79 original monster sprites: palettes, RLE-decompressed 4bpp tiles and OAM frame layouts are decoded so every enemy shows its actual card portrait (0.9.1);
 - fixed monster list layout: the enemy list now has a guaranteed visible width and the first enemy is selected automatically (0.9.2);
 - injection of the 79 enemy names and stat tables into bank `$05`;
 - capacity report and warnings about data that is not injected yet;
+- a spell database (v1.0): the 91 spell slots decoded from bank `$05` — name, accuracy, power and element — editable and injected, with 32 name records;
+- PNG/GIF to SNES conversion (v1.0): an imported monster image is quantized to 15 colors, converted to 4bpp tiles with a generated OAM frame, recompressed and injected in place when it fits the original graphics slot;
+- IPS patch export (v1.0): `File > Export an IPS patch` writes a standard `.ips` patch of the rebuilt ROM so mods can be shared without distributing the ROM;
 - a standalone Windows executable built with PyInstaller.
 
 The second roadmap milestone is underway: grid-carried interactive elements are now visible and editable. Editing their associated detailed tables — exact chest contents, stair destinations and enemy formations — remains to be completed. Injecting into a new ROM still requires safe recompression and patch export.

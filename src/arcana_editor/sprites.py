@@ -81,6 +81,54 @@ def _draw_tile(pixels: list, tile: bytes, x0: int, y0: int, palette: tuple[tuple
                 pixels[y * CANVAS_SIZE + x] = palette[index] if index < len(palette) else index
 
 
+def _snes_value(r: int, g: int, b: int) -> int:
+    return (min(31, r // 8) | (min(31, g // 8) << 5) | (min(31, b // 8) << 10))
+
+
+def image_to_enemy_tiles(image, max_colors: int = 16) -> tuple[bytes, tuple[int, ...], int, int]:
+    """Convertit une image en tiles 4bpp + palette BGR15.
+
+    L'index 0 de la palette est réservé à la transparence ; les couleurs
+    utilisables sont donc les indices 1 à ``max_colors - 1``.
+    """
+    width, height = image.width(), image.height()
+    color_count: dict[tuple[int, int, int], int] = {}
+    for y in range(height):
+        for x in range(width):
+            pixel = image.get(x, y)
+            rgb = pixel[:3] if isinstance(pixel, tuple) else ((pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF)
+            color_count[rgb] = color_count.get(rgb, 0) + 1
+    ranked = sorted(color_count, key=lambda c: -color_count[c])[:max_colors - 1]
+    palette = [0] * max_colors
+    for index, (r, g, b) in enumerate(ranked):
+        palette[index + 1] = _snes_value(r, g, b)
+    lookup = {rgb: index + 1 for index, rgb in enumerate(ranked)}
+    w_tiles = (width + 7) // 8
+    h_tiles = (height + 7) // 8
+    buffer = bytearray(h_tiles * 16 * 32)
+    for ty in range(h_tiles):
+        for tx in range(w_tiles):
+            target = (ty * 16 + tx) * 32
+            planes = bytearray(32)
+            for row in range(8):
+                y = ty * 8 + row
+                for col in range(8):
+                    x = tx * 8 + col
+                    if x >= width or y >= height:
+                        continue
+                    pixel = image.get(x, y)
+                    rgb = pixel[:3] if isinstance(pixel, tuple) else ((pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF)
+                    index = lookup.get(rgb)
+                    if index is None:
+                        index = 1 + min(range(len(ranked)), key=lambda i: sum((ranked[i][c] - rgb[c]) ** 2 for c in range(3)))
+                    for plane in range(4):
+                        if index >> plane & 1:
+                            byte = (row * 2 if plane < 2 else 16 + row * 2) + (plane & 1)
+                            planes[byte] |= 1 << (7 - col)
+            buffer[target:target + 32] = planes
+    return bytes(buffer), tuple(palette), w_tiles * 8, h_tiles * 8
+
+
 def enemy_frame_table(data: bytes, enemy_id: int) -> tuple[int, ...]:
     table_address = data[ENEMY_TILESET_TABLE_PC + (ENEMY_TILESET_BASE + enemy_id) * 3:][:3]
     address = table_address[0] | (table_address[1] << 8) | (table_address[2] << 16)

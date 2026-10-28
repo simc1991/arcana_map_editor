@@ -50,6 +50,10 @@ class Enemy:
     equip_amulet: int = 0
     spell: int = 0
     sprite: str = ""
+    sprite_tiles: str = ""
+    sprite_palette: str = ""
+    sprite_w: int = 0
+    sprite_h: int = 0
     custom: bool = False
     enabled: bool = True
 

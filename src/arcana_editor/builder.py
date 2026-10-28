@@ -70,6 +70,7 @@ class BuildReport:
     shop_slots_written: int = 0
     encounters_written: int = 0
     enemies_written: int = 0
+    spells_written: int = 0
     warnings: tuple[str, ...] = ()
 
 
@@ -362,6 +363,60 @@ def _inject_items(project: ArcanaProject, rom: bytearray, warnings: list[str]) -
     return injected
 
 
+def _inject_enemy_sprite(rom: bytearray, enemy) -> None:
+    from .sprites import (
+        ENEMY_PALETTE_BANK_PC,
+        ENEMY_PALETTE_TABLE_PC,
+        OAM_ENTRY_SIZE,
+        _lorom_pc,
+        _parse_frame_entries,
+        enemy_frame_table,
+    )
+    import struct as _struct
+
+    tiles = bytes.fromhex(enemy.sprite_tiles)
+    colors = bytes.fromhex(enemy.sprite_palette)
+    pointer = _struct.unpack_from("<H", rom, ENEMY_PALETTE_TABLE_PC + enemy.enemy_id * 2)[0]
+    header = _lorom_pc((rom[ENEMY_PALETTE_BANK_PC + enemy.enemy_id] << 16) | pointer)
+    palette_size = _struct.unpack_from("<H", rom, header + 2)[0]
+    gfx_offset = header + 4 + palette_size
+    gfx_address = rom[gfx_offset] | (rom[gfx_offset + 1] << 8) | (rom[gfx_offset + 2] << 16)
+    gfx_pc = _lorom_pc(gfx_address)
+    destination = _struct.unpack_from("<H", rom, gfx_pc)[0]
+    base_tile = max(0, (destination - 0x6000) // 16)
+    original, used = decompress_hal(rom, gfx_pc + 2, 0x20000)
+    if len(tiles) > len(original):
+        raise RomError(f"Le sprite de {enemy.name} dépasse la taille graphique originale ({len(tiles)} > {len(original)} octets)")
+    padded = tiles.ljust(len(original), b"\x00")
+    compressed = compress_hal(padded)
+    if len(compressed) > used:
+        raise RomError(f"Le sprite compressé de {enemy.name} ne tient pas dans l’emplacement du ROM ({len(compressed)} > {used} octets)")
+    rom[gfx_pc + 2:gfx_pc + 2 + used] = compressed.ljust(used, b"\x00")
+    if len(colors) >= 2:
+        limit = min(len(colors), palette_size)
+        rom[header + 4:header + 4 + limit] = colors[:limit]
+    frame_pointer = next((p for p in enemy_frame_table(rom, enemy.enemy_id) if p < 0xC000), None)
+    if frame_pointer is None:
+        raise RomError(f"Aucune frame propre trouvée pour {enemy.name}")
+    frame_pc = _lorom_pc((0x09 << 16) | frame_pointer)
+    original_entries = _parse_frame_entries(rom, frame_pc)
+    span = len(original_entries) * OAM_ENTRY_SIZE
+    columns = max(1, (enemy.sprite_w + 15) // 16)
+    rows = max(1, (enemy.sprite_h + 15) // 16)
+    if columns * rows * OAM_ENTRY_SIZE > span:
+        raise RomError(f"Le cadre OAM de {enemy.name} est trop petit pour l’image ({columns}x{rows})")
+    attr = original_entries[0][4] if original_entries else 0x32
+    entries = bytearray()
+    for row in range(rows):
+        for column in range(columns):
+            tile = base_tile + row * 32 + column * 2
+            x = -columns * 8 + column * 16
+            y = -rows * 8 + row * 16
+            flags = 0x03 if row == rows - 1 and column == columns - 1 else 0x01
+            entries += _struct.pack("<5B", flags, x & 0xFF, y & 0xFF, tile & 0xFF, attr)
+    rom[frame_pc:frame_pc + len(entries)] = entries
+
+
 def _inject_enemies(project: ArcanaProject, rom: bytearray, warnings: list[str]) -> int:
     injected = 0
     for enemy in project.enemies:
@@ -391,10 +446,44 @@ def _inject_enemies(project: ArcanaProject, rom: bytearray, warnings: list[str])
         if not 0 <= enemy.spell <= 0xFF:
             raise RomError(f"Sort hors limites pour {enemy.name}")
         rom[ENEMY_SPELL_PC + enemy.enemy_id] = enemy.spell
+        if enemy.sprite_tiles:
+            _inject_enemy_sprite(rom, enemy)
         injected += 1
     referenced = {enemy_id for group in project.encounter_groups for enemy_id in group.enemy_ids}
     if any(enemy_id >= ENEMY_TABLE_SLOTS for enemy_id in referenced):
         warnings.append("Un groupe de rencontres référence un monstre hors des tables du ROM — ses statistiques ne seront pas injectées.")
+    return injected
+
+
+def _inject_spells(project: ArcanaProject, rom: bytearray) -> int:
+    from .spells import (
+        SPELL_ACCURACY_PC,
+        SPELL_AFFINITY_PC,
+        SPELL_NAME_COUNT,
+        SPELL_NAME_RECORD_SIZE,
+        SPELL_NAMES_PC,
+        SPELL_POWER_PC,
+        SPELL_STAT_COUNT,
+    )
+    injected = 0
+    for spell in project.spells:
+        if spell.spell_id >= SPELL_STAT_COUNT:
+            continue
+        if spell.spell_id < SPELL_NAME_COUNT and spell.name:
+            try:
+                name_bytes = spell.name.encode("ascii")
+            except UnicodeEncodeError:
+                raise RomError(f"Le nom de sort « {spell.name} » contient des caractères non injectables")
+            if len(name_bytes) >= SPELL_NAME_RECORD_SIZE:
+                raise RomError(f"Le nom de sort « {spell.name} » dépasse {SPELL_NAME_RECORD_SIZE - 1} caractères")
+            offset = SPELL_NAMES_PC + spell.spell_id * SPELL_NAME_RECORD_SIZE
+            rom[offset:offset + SPELL_NAME_RECORD_SIZE] = name_bytes.ljust(SPELL_NAME_RECORD_SIZE - 1, b" ") + b"\x00"
+        if not 0 <= spell.accuracy <= 0xFF or not 0 <= spell.power <= 0xFFFF or not 0 <= spell.element <= 0xFFFF:
+            raise RomError(f"Statistiques hors limites pour le sort {spell.display}")
+        rom[SPELL_ACCURACY_PC + spell.spell_id] = spell.accuracy
+        struct.pack_into("<H", rom, SPELL_POWER_PC + spell.spell_id * 2, spell.power)
+        struct.pack_into("<H", rom, SPELL_AFFINITY_PC + spell.spell_id * 2, spell.element)
+        injected += 1
     return injected
 
 
@@ -430,6 +519,7 @@ def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
     warnings: list[str] = []
     items_written = _inject_items(project, rom, warnings)
     enemies_written = _inject_enemies(project, rom, warnings)
+    spells_written = _inject_spells(project, rom)
     checksum = _update_checksum(rom)
     output_path.write_bytes(rom)
     verification = output_path.read_bytes()
@@ -444,5 +534,5 @@ def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
     return BuildReport(
         output_path, len(address_to_data), compressed_total, available, checksum,
         treasures_written, stairs_written, items_written, shop_slots_written,
-        encounters_written, enemies_written, tuple(warnings),
+        encounters_written, enemies_written, spells_written, tuple(warnings),
     )

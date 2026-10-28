@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 import sys
+import tempfile
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -13,12 +14,14 @@ from .events import MapEvent, default_properties
 from .encounter_database import EncounterDatabase
 from .item_database import ItemDatabase
 from .monster_database import MonsterDatabase
+from .patches import build_ips_patch
+from .spell_database import SpellDatabase
 from .project import ArcanaProject
 from .rendering import event_kind, is_walkable, tile_details, tile_style
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
 APP_TITLE = "Arcana Map Studio"
-APP_VERSION = "0.9.2"
+APP_VERSION = "1.0"
 PALETTE = (
     (0x00, "Mur / vide"), (0x10, "Rencontre A"), (0x11, "Rencontre B"),
     (0x20, "Rencontre fréquente"), (0x30, "Sol sûr"), (0x40, "Escalier A"),
@@ -88,6 +91,7 @@ class ArcanaEditor(tk.Tk):
         file_menu.add_command(label="Enregistrer sous…", accelerator="Ctrl+Shift+S", command=lambda: self.save_project(True))
         file_menu.add_separator()
         file_menu.add_command(label="Construire un ROM modifié…", accelerator="Ctrl+B", command=self.export_rom)
+        file_menu.add_command(label="Exporter un patch IPS…", command=self.export_patch)
         file_menu.add_separator()
         file_menu.add_command(label="Quitter", command=self._close)
         edit_menu = tk.Menu(menu, tearoff=False)
@@ -103,6 +107,7 @@ class ArcanaEditor(tk.Tk):
         database_menu.add_command(label="Objets et équipements…", command=self.open_item_database)
         database_menu.add_command(label="Groupes de rencontres…", command=self.open_encounter_database)
         database_menu.add_command(label="Monstres…", command=self.open_monster_database)
+        database_menu.add_command(label="Sorts…", command=self.open_spell_database)
         help_menu = tk.Menu(menu, tearoff=False)
         help_menu.add_command(label="À propos", command=self._about)
         menu.add_cascade(label="Fichier", menu=file_menu)
@@ -380,6 +385,44 @@ class ArcanaEditor(tk.Tk):
         self._refresh_events()
         self._update_title()
         self.status.set(f"Base de données monstres mise à jour — {len(self.project.enemies)} entrées disponibles")
+
+    def open_spell_database(self) -> None:
+        if not self.project:
+            messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
+            return
+        SpellDatabase(self, self.project, self._spell_database_changed)
+
+    def _spell_database_changed(self) -> None:
+        self._refresh_events()
+        self._update_title()
+        self.status.set(f"Base de données sorts mise à jour — {len(self.project.spells)} entrées disponibles")
+
+    def export_patch(self) -> None:
+        if not self.project:
+            messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
+            return
+        destination = filedialog.asksaveasfilename(
+            title="Exporter un patch IPS",
+            defaultextension=".ips",
+            filetypes=(("Patch IPS", "*.ips"), ("Tous les fichiers", "*.*")),
+            parent=self,
+        )
+        if not destination:
+            return
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".sfc", delete=False) as temporary:
+                temp_path = Path(temporary.name)
+            try:
+                report = build_rom(self.project, temp_path)
+                patched = temp_path.read_bytes()
+            finally:
+                temp_path.unlink(missing_ok=True)
+            patch = build_ips_patch(self.project.rom.data, patched)
+            Path(destination).write_bytes(patch)
+        except RomError as error:
+            messagebox.showerror("Export impossible", str(error), parent=self)
+            return
+        self.status.set(f"Patch IPS exporté : {Path(destination).name} ({len(patch)} octets) — {report.warnings and 'avertissements : ' + '; '.join(report.warnings) or 'aucun avertissement'}")
 
     def export_rom(self) -> None:
         if not self.project:

@@ -142,6 +142,70 @@ def test_builder_injects_enemy_stats(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
+def test_builder_injects_spell_stats(tmp_path: Path) -> None:
+    from arcana_editor.spells import Spell
+    rom = ArcanaRom(ROM)
+    project = ArcanaProject.from_rom(rom)
+    project.save_spell(Spell(1, "Storm Bolt", accuracy=200, power=999, element=5))
+    destination = tmp_path / "Arcana Spells.sfc"
+    report = build_rom(project, destination)
+    assert report.spells_written == 91
+    rebuilt = ArcanaRom(destination)
+    edited = rebuilt.spells[1]
+    assert edited.name == "Storm Bolt"
+    assert (edited.accuracy, edited.power, edited.element) == (200, 999, 5)
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
+def test_ips_patch_contains_differences(tmp_path: Path) -> None:
+    from arcana_editor.patches import build_ips_patch
+    rom = ArcanaRom(ROM)
+    project = ArcanaProject.from_rom(rom)
+    slime = project.enemies[0]
+    project.save_enemy(slime.clone(name="Patched", hp=77), slime.key)
+    destination = tmp_path / "Arcana Patch.sfc"
+    build_rom(project, destination)
+    patch = build_ips_patch(rom.data, destination.read_bytes())
+    assert patch.startswith(b"PATCH")
+    assert patch.endswith(b"EOF")
+    rebuilt = rom.data[:]
+    destination_bytes = destination.read_bytes()
+    changed = [i for i in range(len(rebuilt)) if rebuilt[i] != destination_bytes[i]]
+    assert len(patch) >= 5
+    assert changed
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
+def test_builder_injects_enemy_sprite(tmp_path: Path) -> None:
+    from arcana_editor.sprites import image_to_enemy_tiles
+
+    class FakeImage:
+        def width(self) -> int:
+            return 32
+
+        def height(self) -> int:
+            return 16
+
+        def get(self, x: int, y: int) -> tuple[int, int, int]:
+            return (64, 192, 96) if x < 16 else (32, 96, 192)
+
+    tiles, palette, width, height = image_to_enemy_tiles(FakeImage())
+    assert width == 32 and height == 16
+    rom = ArcanaRom(ROM)
+    project = ArcanaProject.from_rom(rom)
+    slime = project.enemies[0]
+    project.save_enemy(slime.clone(
+        sprite_tiles=tiles.hex(),
+        sprite_palette=b"".join(int(v).to_bytes(2, "little") for v in palette).hex(),
+        sprite_w=width, sprite_h=height,
+    ), slime.key)
+    destination = tmp_path / "Arcana Sprite.sfc"
+    report = build_rom(project, destination)
+    assert report.enemies_written == 79
+    assert destination.read_bytes() != rom.data
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
 def test_builder_rejects_invalid_item_data(tmp_path: Path) -> None:
     rom = ArcanaRom(ROM)
     project = ArcanaProject.from_rom(rom)

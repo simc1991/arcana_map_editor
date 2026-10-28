@@ -10,8 +10,9 @@ from .events import MapEvent, default_properties, event_key
 from .items import GameItem
 from .rendering import event_kind
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
+from .spells import Spell
 
-PROJECT_FORMAT = 7
+PROJECT_FORMAT = 8
 
 
 @dataclass
@@ -22,6 +23,7 @@ class ArcanaProject:
     item_overrides: dict[str, dict] = field(default_factory=dict)
     encounter_overrides: dict[str, dict] = field(default_factory=dict)
     enemy_overrides: dict[str, dict] = field(default_factory=dict)
+    spell_overrides: dict[str, dict] = field(default_factory=dict)
     path: Path | None = None
     dirty: bool = False
 
@@ -109,6 +111,21 @@ class ArcanaProject:
             if enemy_id not in used:
                 return enemy_id
         raise ValueError("Aucun identifiant de monstre libre")
+
+    @property
+    def spells(self) -> tuple[Spell, ...]:
+        merged = {spell.key: spell.clone() for spell in self.rom.spells}
+        for key, payload in self.spell_overrides.items():
+            merged[key] = Spell.from_dict(payload)
+        return tuple(sorted(merged.values(), key=lambda spell: spell.spell_id))
+
+    def save_spell(self, spell: Spell) -> None:
+        if not 0 <= spell.spell_id <= 0xFF:
+            raise ValueError("L’identifiant doit être compris entre 0 et 255")
+        if not 0 <= spell.accuracy <= 0xFF or not 0 <= spell.element <= 0xFFFF or not 0 <= spell.power <= 0xFFFF:
+            raise ValueError("Les statistiques du sort sont hors limites")
+        self.spell_overrides[spell.key] = spell.to_dict()
+        self.dirty = True
 
     def encounters_for_map(self, map_index: int) -> tuple[EncounterGroup, ...]:
         from .encounters import chapter_for_map
@@ -242,13 +259,14 @@ class ArcanaProject:
         return {
             "format": PROJECT_FORMAT,
             "game": "Arcana (USA)",
-            "editor_version": "0.9",
+            "editor_version": "1.0",
             "base_rom_sha256": self.rom.info.sha256,
             "maps": {f"{address:06X}": list(tiles) for address, tiles in sorted(self.maps.items())},
             "events": self.event_metadata,
             "items": self.item_overrides,
             "encounters": self.encounter_overrides,
             "enemies": self.enemy_overrides,
+            "spells": self.spell_overrides,
         }
 
     def save(self, path: str | Path | None = None) -> None:
@@ -263,7 +281,7 @@ class ArcanaProject:
     def load(cls, rom: ArcanaRom, path: str | Path) -> "ArcanaProject":
         source = Path(path)
         payload = json.loads(source.read_text(encoding="utf-8"))
-        if payload.get("format") not in (1, 2, 3, 4, 5, 6, PROJECT_FORMAT):
+        if payload.get("format") not in (1, 2, 3, 4, 5, 6, 7, PROJECT_FORMAT):
             raise RomError("Version de projet non prise en charge")
         if payload.get("base_rom_sha256") != rom.info.sha256:
             raise RomError("Le projet ne correspond pas au ROM chargé")
@@ -283,4 +301,7 @@ class ArcanaProject:
         enemies = payload.get("enemies", {})
         if not isinstance(enemies, dict):
             raise RomError("Base de données de monstres invalide")
-        return cls(rom=rom, maps=maps, event_metadata=metadata, item_overrides=items, encounter_overrides=encounters, enemy_overrides=enemies, path=source)
+        spells = payload.get("spells", {})
+        if not isinstance(spells, dict):
+            raise RomError("Base de données de sorts invalide")
+        return cls(rom=rom, maps=maps, event_metadata=metadata, item_overrides=items, encounter_overrides=encounters, enemy_overrides=enemies, spell_overrides=spells, path=source)

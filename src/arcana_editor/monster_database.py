@@ -7,7 +7,7 @@ from typing import Callable
 
 from .enemies import ELEMENTS, RACES, Enemy
 from .project import ArcanaProject
-from .sprites import build_enemy_tile_buffer, enemy_sprite_rgb
+from .sprites import build_enemy_tile_buffer, enemy_sprite_rgb, image_to_enemy_tiles
 
 STAT_FIELDS = (
     ("hp", "PV"), ("level", "Niveau"), ("strength", "Force"), ("intelligence", "Intelligence"),
@@ -32,6 +32,11 @@ class MonsterDatabase(tk.Toplevel):
         self.sprite_image: tk.PhotoImage | None = None
         self._tile_buffer: dict | None = None
         self._rom_sprite = False
+        self._loaded_image: tk.PhotoImage | None = None
+        self._sprite_tiles = ""
+        self._sprite_palette = ""
+        self._sprite_w = 0
+        self._sprite_h = 0
         self.stats = {key: tk.IntVar(value=0) for key, _ in STAT_FIELDS}
         self.combat = {key: tk.IntVar(value=0) for key, _ in COMBAT_FIELDS}
         self.race = tk.StringVar(value=RACES[0])
@@ -101,8 +106,9 @@ class MonsterDatabase(tk.Toplevel):
         sprite_buttons = ttk.Frame(sprite_box)
         sprite_buttons.pack(fill="x", pady=(8, 0))
         ttk.Button(sprite_buttons, text="Charger une image…", command=self._load_sprite).pack(side="left", fill="x", expand=True)
-        ttk.Button(sprite_buttons, text="Retirer", command=self._clear_sprite).pack(side="left", padx=(4, 0))
-        ttk.Label(general, text="Le sprite du ROM est affiché par défaut. Chargez un PNG ou GIF pour le remplacer dans le projet ; la conversion en tiles SNES est prévue pour une version ultérieure.", wraplength=360, justify="left").grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        ttk.Button(sprite_buttons, text="Convertir → ROM", command=self._convert_sprite).pack(side="left", padx=4)
+        ttk.Button(sprite_buttons, text="Retirer", command=self._clear_sprite).pack(side="left")
+        ttk.Label(general, text="Le sprite du ROM est affiché par défaut. Chargez un PNG ou GIF puis « Convertir → ROM » pour l’injecter dans le ROM construit (max 16 couleurs).", wraplength=360, justify="left").grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
         general.columnconfigure(0, weight=1)
         for row, (key, label) in enumerate(STAT_FIELDS):
             ttk.Label(stats, text=label).grid(row=row, column=0, sticky="w", pady=5)
@@ -150,10 +156,15 @@ class MonsterDatabase(tk.Toplevel):
         self.race.set(RACES.get(enemy.race, f"Race ${enemy.race:02X}"))
         self.element.set(ELEMENTS.get(enemy.element, f"Élément ${enemy.element:02X}"))
         self._set_sprite(enemy.sprite)
+        self._sprite_tiles = enemy.sprite_tiles
+        self._sprite_palette = enemy.sprite_palette
+        self._sprite_w = enemy.sprite_w
+        self._sprite_h = enemy.sprite_h
 
     def _set_sprite(self, sprite_b64: str) -> None:
         self.sprite_b64 = sprite_b64
         self.sprite_image = None
+        self._loaded_image = None
         if sprite_b64:
             try:
                 self.sprite_image = tk.PhotoImage(data=sprite_b64)
@@ -190,14 +201,37 @@ class MonsterDatabase(tk.Toplevel):
         try:
             raw = open(path, "rb").read()
             encoded = base64.b64encode(raw).decode("ascii")
-            tk.PhotoImage(data=encoded)
+            self._loaded_image = tk.PhotoImage(data=encoded)
         except (OSError, tk.TclError) as error:
             messagebox.showerror("Image invalide", f"Impossible de charger cette image : {error}", parent=self)
             return
         self._set_sprite(encoded)
 
+    def _convert_sprite(self) -> None:
+        if self._loaded_image is None:
+            messagebox.showinfo("Aucune image", "Chargez d’abord une image PNG ou GIF.", parent=self)
+            return
+        try:
+            tiles, palette, width, height = image_to_enemy_tiles(self._loaded_image)
+        except (tk.TclError, ValueError) as error:
+            messagebox.showerror("Conversion impossible", str(error), parent=self)
+            return
+        self._sprite_tiles = tiles.hex()
+        self._sprite_palette = b"".join(int(value).to_bytes(2, "little") for value in palette).hex()
+        self._sprite_w = width
+        self._sprite_h = height
+        messagebox.showinfo(
+            "Conversion réussie",
+            f"Image convertie en {len(tiles) // 32} tiles SNES ({width}×{height} px, {sum(1 for c in palette if c)} couleurs).\nEnregistrez le monstre puis construisez le ROM pour l’injecter.",
+            parent=self,
+        )
+
     def _clear_sprite(self) -> None:
         self._set_sprite("")
+        self._sprite_tiles = ""
+        self._sprite_palette = ""
+        self._sprite_w = 0
+        self._sprite_h = 0
 
     def _enemy_from_form(self, custom: bool | None = None) -> Enemy:
         original = next((candidate for candidate in self.project.enemies if candidate.key == self.current_key), None)
@@ -212,6 +246,8 @@ class MonsterDatabase(tk.Toplevel):
             attack_animation=int(self.combat["attack_animation"].get()),
             equip_armor=int(self.combat["equip_armor"].get()), equip_amulet=int(self.combat["equip_amulet"].get()),
             spell=int(self.combat["spell"].get()), sprite=self.sprite_b64,
+            sprite_tiles=self._sprite_tiles, sprite_palette=self._sprite_palette,
+            sprite_w=self._sprite_w, sprite_h=self._sprite_h,
             custom=custom if custom is not None else (original.custom if original else True),
         )
 
