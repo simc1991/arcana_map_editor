@@ -116,7 +116,7 @@ Roadmap:
 3. **in progress** — perspective wall and corridor preview delivered in 0.3; extraction and rendering of real SNES tiles still to be done;
 4. **delivered in 0.5 at project level — Item database**: editing and creation, statistics, prices, vendors and automatic availability in chests; ROM injection awaits the builder;
 5. editing of towns, enemies, general statistics and dialogue;
-6. **planned — Monster editor**: an RPG Maker-style enemy database allowing you to load a monster image (converted to the SNES tile format), configure stats, attacks, spells, elemental affinities and rewards, preview the sprite in the editor and inject the tables into the ROM;
+6. **planned for 0.9 — Monster editor**: an RPG Maker-style enemy database allowing you to load a monster image (converted to the SNES tile format), configure stats, attacks, spells, elemental affinities and rewards, preview the sprite in the editor and inject the tables into the ROM;
 7. verifiable ROM reconstruction pipeline from a locally provided dump;
 8. **partially delivered** — undo/redo history and RPG Maker-style drawing tools; layers, advanced selection and validation remain to be done.
 
@@ -166,7 +166,7 @@ The chest catalog will use a single source shared with the database. A creation 
 5. add identifier allocation and item creation;
 6. inject the modified tables through the future ROM builder and verify the result in an emulator.
 
-## Monster editor module — roadmap
+## Monster editor module — roadmap (0.9)
 
 A future module dedicated to battle enemies, on the model of the RPG Maker enemy database:
 
