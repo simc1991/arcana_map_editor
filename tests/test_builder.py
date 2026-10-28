@@ -123,6 +123,25 @@ def test_builder_injects_items_shops_and_encounters(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
+def test_builder_injects_enemy_stats(tmp_path: Path) -> None:
+    rom = ArcanaRom(ROM)
+    project = ArcanaProject.from_rom(rom)
+    slime = project.enemies[0]
+    project.save_enemy(slime.clone(
+        name="Mega Slime", hp=250, exp=99, gp=123, level=9,
+        strength=77, race=3, element=5, spell=4, attack_animation=20,
+    ), slime.key)
+    destination = tmp_path / "Arcana Enemies.sfc"
+    report = build_rom(project, destination)
+    assert report.enemies_written == 79
+    rebuilt = ArcanaRom(destination)
+    edited = rebuilt.enemies[0]
+    assert edited.name == "Mega Slime"
+    assert (edited.hp, edited.exp, edited.gp, edited.level, edited.strength) == (250, 99, 123, 9, 77)
+    assert (edited.race, edited.element, edited.spell, edited.attack_animation) == (3, 5, 4, 20)
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
 def test_builder_rejects_invalid_item_data(tmp_path: Path) -> None:
     rom = ArcanaRom(ROM)
     project = ArcanaProject.from_rom(rom)

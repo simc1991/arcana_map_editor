@@ -4,7 +4,7 @@ Open source map editor and analysis tools for **Arcana (USA)** on the Super Nint
 
 ## Current state
 
-Version `0.8` provides:
+Version `0.9` provides:
 
 - validation of the Arcana USA LoROM dump, with or without a 512-byte copier header;
 - SNES header reading, SHA-256 and CRC32;
@@ -50,6 +50,9 @@ Version `0.8` provides:
 - an encounter group database with per-chapter editing, enemy selection and zones;
 - reconstruction and relocation of the 5 Outfitter shop inventories in bank `$03`;
 - reconstruction and relocation of the 5 encounter group tables in bank `$18`;
+- a monster database with per-enemy stats: HP, EXP, GP, level, STR/INT/END/ALERT, race, element, attack animation, equipped defenses and spell;
+- monster image loading (PNG/GIF) with in-editor preview, stored in the project for the future SNES tile conversion;
+- injection of the 79 enemy names and stat tables into bank `$05`;
 - capacity report and warnings about data that is not injected yet;
 - a standalone Windows executable built with PyInstaller.
 
@@ -87,6 +90,8 @@ Version 0.7.1 fully rebuilds and relocates the chest and stair tables in the ver
 
 Version 0.8 additionally injects the item database and encounter tables: item names, prices, equipment statistics and equip flags are written in place, the five Outfitter inventories are rebuilt and relocated in bank `$03`, and the five encounter group tables are rebuilt and relocated in bank `$18` behind the chest data. Item identifiers outside the original ROM ranges, attribute bonuses and vendor assignments on consumables remain project-only.
 
+Version 0.9 adds the monster database: every enemy's name, stats, affinity, attack animation, equipped defenses and spell are editable and injected into the ROM. A monster image can be loaded and previewed in the editor; it stays in the project file until the SNES 4bpp tile conversion lands. Enemies created beyond the original 80 slots remain project-only.
+
 ## Extract the maps
 
 ```powershell
@@ -122,7 +127,7 @@ Roadmap:
 3. **in progress** — perspective wall and corridor preview delivered in 0.3; extraction and rendering of real SNES tiles still to be done;
 4. **delivered in 0.5/0.8 — Item database**: editing and creation, statistics, prices, vendors and automatic availability in chests; ROM injection delivered in 0.8;
 5. editing of towns, enemies, general statistics and dialogue;
-6. **planned for 0.9 — Monster editor**: an RPG Maker-style enemy database allowing you to load a monster image (converted to the SNES tile format), configure stats, attacks, spells, elemental affinities and rewards, preview the sprite in the editor and inject the tables into the ROM;
+6. **delivered in 0.9 — Monster editor**: an RPG Maker-style enemy database with monster image loading, stats, spells, elemental affinities and rewards injected into the ROM; SNES tile conversion of imported images remains to be done;
 7. verifiable ROM reconstruction pipeline from a locally provided dump;
 8. **partially delivered** — undo/redo history and RPG Maker-style drawing tools; layers, advanced selection and validation remain to be done.
 
@@ -172,18 +177,17 @@ The chest catalog will use a single source shared with the database. A creation 
 5. add identifier allocation and item creation;
 6. inject the modified tables through the ROM builder (delivered in 0.8) and verify the result in an emulator.
 
-## Monster editor module — roadmap (0.9)
+## Monster editor module — delivered in 0.9
 
-A future module dedicated to battle enemies, on the model of the RPG Maker enemy database:
+The module follows the RPG Maker enemy database model:
 
-- enemy list with search, filters, duplication and deletion;
-- editable statistics: HP, attack, defense, magic, speed and rewards (experience, gold, drops);
-- **monster image loading**: import a PNG/BMP image from the editor, preview it in the battle layout, and — as a longer-term goal — convert it to the SNES 4bpp tile format for ROM injection;
-- attack and AI configuration: normal attacks, spells, attack patterns and conditions;
-- elemental affinities, resistances and status immunities where the ROM format allows;
-- assignment to encounter groups and dungeon zones;
-- storage in the project first, then table injection through the ROM builder;
-- verification of the result in an emulator.
+- enemy list with search, duplication and deletion;
+- editable statistics decoded from the ROM: HP, EXP, GP, level, strength, intelligence, endurance and alertness;
+- **monster image loading**: import a PNG/GIF image, preview it in the editor, stored in the project — conversion to the SNES 4bpp tile format is the remaining long-term goal;
+- combat configuration: attack animation, equipped armor/amulet defenses and spell;
+- race and elemental affinity editing;
+- all 79 enemy names and stat tables injected into bank `$05`;
+- enemies created beyond the original 80 slots stay in the project, with a warning when referenced by an encounter group.
 
 ## Legality
 

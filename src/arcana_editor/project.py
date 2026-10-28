@@ -5,12 +5,13 @@ import json
 from pathlib import Path
 
 from .encounters import EncounterGroup
+from .enemies import Enemy
 from .events import MapEvent, default_properties, event_key
 from .items import GameItem
 from .rendering import event_kind
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
-PROJECT_FORMAT = 6
+PROJECT_FORMAT = 7
 
 
 @dataclass
@@ -20,6 +21,7 @@ class ArcanaProject:
     event_metadata: dict[str, dict] = field(default_factory=dict)
     item_overrides: dict[str, dict] = field(default_factory=dict)
     encounter_overrides: dict[str, dict] = field(default_factory=dict)
+    enemy_overrides: dict[str, dict] = field(default_factory=dict)
     path: Path | None = None
     dirty: bool = False
 
@@ -60,6 +62,53 @@ class ArcanaProject:
     def remove_encounter_override(self, chapter: int, group_id: int) -> None:
         self.encounter_overrides.pop(f"{chapter}:{group_id}", None)
         self.dirty = True
+
+    @property
+    def enemies(self) -> tuple[Enemy, ...]:
+        merged = {enemy.key: enemy.clone() for enemy in self.rom.enemies}
+        for key, payload in self.enemy_overrides.items():
+            enemy = Enemy.from_dict(payload)
+            if enemy.enabled:
+                merged[key] = enemy
+            else:
+                merged.pop(key, None)
+        return tuple(sorted(merged.values(), key=lambda enemy: enemy.enemy_id))
+
+    def save_enemy(self, enemy: Enemy, old_key: str | None = None) -> None:
+        if not enemy.name.strip():
+            raise ValueError("Le nom du monstre est obligatoire")
+        if not 0 <= enemy.enemy_id <= 0xFF:
+            raise ValueError("L’identifiant doit être compris entre 0 et 255")
+        word_fields = ("hp", "exp", "gp", "level", "strength", "intelligence", "endurance", "alertness", "attack_animation", "equip_armor", "equip_amulet")
+        for field_name in word_fields:
+            if not 0 <= int(getattr(enemy, field_name)) <= 0xFFFF:
+                raise ValueError(f"La statistique {field_name} doit être comprise entre 0 et 65535")
+        for field_name in ("race", "element", "spell"):
+            if not 0 <= int(getattr(enemy, field_name)) <= 0xFF:
+                raise ValueError(f"La statistique {field_name} doit être comprise entre 0 et 255")
+        if old_key and old_key != enemy.key:
+            self.enemy_overrides.pop(old_key, None)
+        collision = next((candidate for candidate in self.enemies if candidate.key == enemy.key and candidate.key != old_key), None)
+        if collision:
+            raise ValueError(f"L’identifiant {enemy.key} est déjà utilisé par {collision.name}")
+        self.enemy_overrides[enemy.key] = enemy.to_dict()
+        self.dirty = True
+
+    def remove_custom_enemy(self, key: str) -> None:
+        enemy = next((candidate for candidate in self.enemies if candidate.key == key), None)
+        if not enemy or not enemy.custom:
+            raise ValueError("Seuls les monstres créés dans le projet peuvent être supprimés")
+        payload = enemy.to_dict()
+        payload["enabled"] = False
+        self.enemy_overrides[key] = payload
+        self.dirty = True
+
+    def next_enemy_id(self) -> int:
+        used = {enemy.enemy_id for enemy in self.enemies}
+        for enemy_id in range(1, 0x100):
+            if enemy_id not in used:
+                return enemy_id
+        raise ValueError("Aucun identifiant de monstre libre")
 
     def encounters_for_map(self, map_index: int) -> tuple[EncounterGroup, ...]:
         from .encounters import chapter_for_map
@@ -193,12 +242,13 @@ class ArcanaProject:
         return {
             "format": PROJECT_FORMAT,
             "game": "Arcana (USA)",
-            "editor_version": "0.8",
+            "editor_version": "0.9",
             "base_rom_sha256": self.rom.info.sha256,
             "maps": {f"{address:06X}": list(tiles) for address, tiles in sorted(self.maps.items())},
             "events": self.event_metadata,
             "items": self.item_overrides,
             "encounters": self.encounter_overrides,
+            "enemies": self.enemy_overrides,
         }
 
     def save(self, path: str | Path | None = None) -> None:
@@ -213,7 +263,7 @@ class ArcanaProject:
     def load(cls, rom: ArcanaRom, path: str | Path) -> "ArcanaProject":
         source = Path(path)
         payload = json.loads(source.read_text(encoding="utf-8"))
-        if payload.get("format") not in (1, 2, 3, 4, 5, PROJECT_FORMAT):
+        if payload.get("format") not in (1, 2, 3, 4, 5, 6, PROJECT_FORMAT):
             raise RomError("Version de projet non prise en charge")
         if payload.get("base_rom_sha256") != rom.info.sha256:
             raise RomError("Le projet ne correspond pas au ROM chargé")
@@ -230,4 +280,7 @@ class ArcanaProject:
         encounters = payload.get("encounters", {})
         if not isinstance(encounters, dict):
             raise RomError("Groupes de rencontres invalides")
-        return cls(rom=rom, maps=maps, event_metadata=metadata, item_overrides=items, encounter_overrides=encounters, path=source)
+        enemies = payload.get("enemies", {})
+        if not isinstance(enemies, dict):
+            raise RomError("Base de données de monstres invalide")
+        return cls(rom=rom, maps=maps, event_metadata=metadata, item_overrides=items, encounter_overrides=encounters, enemy_overrides=enemies, path=source)

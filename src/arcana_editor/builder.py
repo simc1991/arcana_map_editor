@@ -6,6 +6,24 @@ import struct
 
 from .compression import compress_hal
 from .encounters import ENCOUNTER_POINTER_TABLE_PC, chapter_for_map
+from .enemies import (
+    ENEMY_AFFINITY_PC,
+    ENEMY_ALERT_PC,
+    ENEMY_ATK_ANIM_PC,
+    ENEMY_ENDUR_PC,
+    ENEMY_EQ_AMULET_PC,
+    ENEMY_EQ_ARMOR_PC,
+    ENEMY_EXP_PC,
+    ENEMY_GP_PC,
+    ENEMY_HP_PC,
+    ENEMY_INT_PC,
+    ENEMY_LVL_PC,
+    ENEMY_NAMES_PC,
+    ENEMY_RECORD_SIZE,
+    ENEMY_SPELL_PC,
+    ENEMY_STR_PC,
+    ENEMY_TABLE_SLOTS,
+)
 from .items import (
     AMULET_DEFENSE_PC,
     AMULET_MAGIC_DEFENSE_PC,
@@ -51,6 +69,7 @@ class BuildReport:
     items_written: int = 0
     shop_slots_written: int = 0
     encounters_written: int = 0
+    enemies_written: int = 0
     warnings: tuple[str, ...] = ()
 
 
@@ -343,6 +362,42 @@ def _inject_items(project: ArcanaProject, rom: bytearray, warnings: list[str]) -
     return injected
 
 
+def _inject_enemies(project: ArcanaProject, rom: bytearray, warnings: list[str]) -> int:
+    injected = 0
+    for enemy in project.enemies:
+        if enemy.enemy_id >= ENEMY_TABLE_SLOTS:
+            warnings.append(f"{enemy.display} : identifiant hors des tables de monstres du ROM — conservé dans le projet uniquement.")
+            continue
+        try:
+            name_bytes = enemy.name.encode("ascii")
+        except UnicodeEncodeError:
+            raise RomError(f"Le nom de « {enemy.name} » contient des caractères non injectables dans le ROM")
+        if len(name_bytes) > ENEMY_RECORD_SIZE:
+            raise RomError(f"Le nom « {enemy.name} » dépasse la limite de {ENEMY_RECORD_SIZE} caractères du ROM")
+        offset = ENEMY_NAMES_PC + enemy.enemy_id * ENEMY_RECORD_SIZE
+        rom[offset:offset + ENEMY_RECORD_SIZE] = name_bytes.ljust(ENEMY_RECORD_SIZE, b"\x00")
+        stats = (
+            (ENEMY_HP_PC, enemy.hp), (ENEMY_EXP_PC, enemy.exp), (ENEMY_GP_PC, enemy.gp),
+            (ENEMY_LVL_PC, enemy.level), (ENEMY_STR_PC, enemy.strength), (ENEMY_INT_PC, enemy.intelligence),
+            (ENEMY_ENDUR_PC, enemy.endurance), (ENEMY_ALERT_PC, enemy.alertness),
+            (ENEMY_ATK_ANIM_PC, enemy.attack_animation), (ENEMY_EQ_ARMOR_PC, enemy.equip_armor),
+            (ENEMY_EQ_AMULET_PC, enemy.equip_amulet),
+            (ENEMY_AFFINITY_PC, (enemy.race << 8) | enemy.element),
+        )
+        for base, value in stats:
+            if not 0 <= value <= 0xFFFF:
+                raise RomError(f"Statistique hors limites pour {enemy.name}")
+            struct.pack_into("<H", rom, base + enemy.enemy_id * 2, value)
+        if not 0 <= enemy.spell <= 0xFF:
+            raise RomError(f"Sort hors limites pour {enemy.name}")
+        rom[ENEMY_SPELL_PC + enemy.enemy_id] = enemy.spell
+        injected += 1
+    referenced = {enemy_id for group in project.encounter_groups for enemy_id in group.enemy_ids}
+    if any(enemy_id >= ENEMY_TABLE_SLOTS for enemy_id in referenced):
+        warnings.append("Un groupe de rencontres référence un monstre hors des tables du ROM — ses statistiques ne seront pas injectées.")
+    return injected
+
+
 def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
     output_path = Path(destination)
     source = project.rom
@@ -374,6 +429,7 @@ def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
     shop_slots_written, _ = _rebuild_shops(project, rom, bank03_cursor)
     warnings: list[str] = []
     items_written = _inject_items(project, rom, warnings)
+    enemies_written = _inject_enemies(project, rom, warnings)
     checksum = _update_checksum(rom)
     output_path.write_bytes(rom)
     verification = output_path.read_bytes()
@@ -388,5 +444,5 @@ def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
     return BuildReport(
         output_path, len(address_to_data), compressed_total, available, checksum,
         treasures_written, stairs_written, items_written, shop_slots_written,
-        encounters_written, tuple(warnings),
+        encounters_written, enemies_written, tuple(warnings),
     )

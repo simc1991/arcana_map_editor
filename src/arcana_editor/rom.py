@@ -7,6 +7,7 @@ import struct
 import zlib
 
 from .encounters import EncounterGroup, chapter_for_map, enemy_names, read_encounter_groups
+from .enemies import Enemy, read_enemies
 from .items import GameItem, read_item_catalog
 
 ROM_SIZE = 0x100000
@@ -188,6 +189,7 @@ class ArcanaRom:
         self.stairs = self._read_stairs()
         self.encounter_groups: tuple[EncounterGroup, ...] = read_encounter_groups(self.data)
         self.enemy_names: tuple[str, ...] = enemy_names(self.data)
+        self.enemies: tuple[Enemy, ...] = read_enemies(self.data)
 
     def encounters_for_map(self, map_index: int) -> tuple[EncounterGroup, ...]:
         chapter = chapter_for_map(map_index)

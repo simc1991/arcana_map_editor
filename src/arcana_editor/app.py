@@ -12,12 +12,13 @@ from .event_editor import EventEditor
 from .events import MapEvent, default_properties
 from .encounter_database import EncounterDatabase
 from .item_database import ItemDatabase
+from .monster_database import MonsterDatabase
 from .project import ArcanaProject
 from .rendering import event_kind, is_walkable, tile_details, tile_style
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
 APP_TITLE = "Arcana Map Studio"
-APP_VERSION = "0.8"
+APP_VERSION = "0.9"
 PALETTE = (
     (0x00, "Mur / vide"), (0x10, "Rencontre A"), (0x11, "Rencontre B"),
     (0x20, "Rencontre fréquente"), (0x30, "Sol sûr"), (0x40, "Escalier A"),
@@ -101,6 +102,7 @@ class ArcanaEditor(tk.Tk):
         database_menu = tk.Menu(menu, tearoff=False)
         database_menu.add_command(label="Objets et équipements…", command=self.open_item_database)
         database_menu.add_command(label="Groupes de rencontres…", command=self.open_encounter_database)
+        database_menu.add_command(label="Monstres…", command=self.open_monster_database)
         help_menu = tk.Menu(menu, tearoff=False)
         help_menu.add_command(label="À propos", command=self._about)
         menu.add_cascade(label="Fichier", menu=file_menu)
@@ -368,6 +370,17 @@ class ArcanaEditor(tk.Tk):
         self._update_title()
         self.status.set(f"Groupes de rencontres mis à jour — {len(self.project.encounter_groups)} groupes disponibles")
 
+    def open_monster_database(self) -> None:
+        if not self.project:
+            messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
+            return
+        MonsterDatabase(self, self.project, self._monster_database_changed)
+
+    def _monster_database_changed(self) -> None:
+        self._refresh_events()
+        self._update_title()
+        self.status.set(f"Base de données monstres mise à jour — {len(self.project.enemies)} entrées disponibles")
+
     def export_rom(self) -> None:
         if not self.project:
             messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
@@ -394,6 +407,7 @@ class ArcanaEditor(tk.Tk):
             f"Objets injectés : {report.items_written}\n"
             f"Objets en boutique : {report.shop_slots_written}\n"
             f"Groupes de rencontres : {report.encounters_written}\n"
+            f"Monstres injectés : {report.enemies_written}\n"
             f"Checksum SNES : ${report.checksum:04X}\n\n"
             f"Fichier : {report.output_path}"
         )
