@@ -1,93 +1,93 @@
 # Arcana Map Studio
 
-Éditeur open source de cartes et outils d’analyse pour **Arcana (USA)** sur Super Nintendo.
+Open source map editor and analysis tools for **Arcana (USA)** on the Super Nintendo.
 
-## État actuel
+## Current state
 
-La version `0.7.1` fournit :
+Version `0.7.1` provides:
 
-- validation du ROM LoROM d’Arcana USA, avec ou sans en-tête copieur de 512 octets ;
-- lecture de l’en-tête SNES, SHA-256 et CRC32 ;
-- décompression native du format HAL utilisé par le jeu ;
-- extraction des 34 entrées de donjon et des 14 blocs de cartes 32×32 uniques ;
-- espace de travail inspiré de RPG Maker XP avec explorateur, barre d’outils, palette et inspecteur ;
-- rendu top-down WYSIWYG de la logique du jeu avec sols, murs, rencontres, brouillard, escaliers, coffres et événements ;
-- aperçu In-Game en perspective à la première personne, synchronisé avec la carte 2D ;
-- navigation dans le donjon avec `W/S`, rotation avec `A/D` et orientation visible sur le plan ;
-- murs en perspective, profondeur, briques, couloirs et marqueurs interactifs dans l’aperçu ;
-- zoom de 50 à 200 %, grille et affichage optionnel des valeurs techniques ;
-- outils crayon, rectangle, remplissage, pipette et historique annuler/rétablir ;
-- explorateur structuré par chapitre et panneau listant tous les éléments interactifs de la carte ;
-- éditeur d’événements complet par onglets Général, Gameplay et Notes ;
-- noms personnalisés, déplacement, changement de type et variantes sans manipulation hexadécimale obligatoire ;
-- propriétés adaptées au contexte : contenu de coffre, destination, orientation, groupe de rencontres, fréquence, condition et déclenchement ;
-- catalogue de coffre décodé depuis le ROM avec 145 entrées : monnaie, objets, armes, armures, boucliers, accessoires et cartes ;
-- sélecteur d’objet recherchable affichant le nom, la catégorie et l’identifiant du jeu ;
-- Base de données d’objets façon RPG Maker avec recherche et filtres ;
-- modification, duplication et création d’objets conservées dans le projet ;
-- statistiques d’équipement éditables : attaque, défense, défense magique et caractéristiques ;
-- attaque des armes, défense des armures/boucliers/accessoires et défense magique décodées depuis les tables du ROM ;
-- restrictions d’équipement originales décodées par personnage ;
-- champs non pertinents automatiquement désactivés selon la catégorie ;
-- prix d’achat et valeur de revente décodés depuis le ROM pour les équipements ;
-- restrictions d’équipement par personnage et affectation aux vendeurs par chapitre ;
-- nouveaux objets immédiatement disponibles dans le sélecteur des coffres ;
-- recherche instantanée, création, duplication, suppression et navigation vers les événements ;
-- validation des positions, variantes et collisions entre événements ;
-- édition sémantique des rencontres, transitions, coffres et événements encodés dans les tuiles ;
-- explication des variantes, tables de rencontres et fréquences réelles `1/12` ou `1/4` dans l’inspecteur ;
-- prise en compte des cartes partagées entre plusieurs étages de Stavery ;
-- sauvegarde non destructive dans un projet JSON rétrocompatible avec les versions 0.1, 0.2 et 0.3 ;
-- compresseur HAL compatible avec les commandes utilisées par les cartes ;
-- reconstruction et relocation automatique des 14 blocs de cartes dans la banque `$13` ;
-- mise à jour des 34 pointeurs de cartes et du checksum SNES ;
-- export non destructif vers un nouveau fichier `.sfc` avec vérification par redécompression ;
-- injection des types, identifiants, quantités et nouvelles positions des coffres existants ;
-- décodage des tables d’escaliers, y compris la case d’activation adjacente ;
-- injection des cartes cibles, coordonnées et orientations des escaliers internes existants ;
-- rapport du nombre de coffres et d’escaliers effectivement injectés ;
-- rapport de capacité et avertissements sur les données qui ne sont pas encore injectées ;
-- génération d’un exécutable Windows autonome avec PyInstaller.
+- validation of the Arcana USA LoROM dump, with or without a 512-byte copier header;
+- SNES header reading, SHA-256 and CRC32;
+- native decompression of the HAL format used by the game;
+- extraction of the 34 dungeon entries and the 14 unique 32×32 map blocks;
+- an RPG Maker XP-inspired workspace with explorer, toolbar, palette and inspector;
+- WYSIWYG top-down rendering of the game logic with floors, walls, encounters, fog, stairs, chests and events;
+- a first-person In-Game preview synchronized with the 2D map;
+- dungeon navigation with `W/S`, rotation with `A/D` and visible orientation on the plan;
+- perspective walls, depth, bricks, corridors and interactive markers in the preview;
+- zoom from 50 to 200%, grid and optional display of technical values;
+- pencil, rectangle, fill and eyedropper tools with undo/redo history;
+- a chapter-structured explorer and a panel listing every interactive element on the map;
+- a full event editor with General, Gameplay and Notes tabs;
+- custom names, moving, type switching and variants without mandatory hex editing;
+- context-sensitive properties: chest contents, destination, orientation, encounter group, frequency, condition and trigger;
+- chest catalog decoded from the ROM with 145 entries: currency, items, weapons, armors, shields, accessories and cards;
+- a searchable item picker showing name, category and game identifier;
+- an RPG Maker-style item database with search and filters;
+- item editing, duplication and creation stored in the project;
+- editable equipment statistics: attack, defense, magic defense and attributes;
+- weapon attack, armor/shield/accessory defense and magic defense decoded from ROM tables;
+- original per-character equipment restrictions;
+- irrelevant fields automatically disabled depending on the category;
+- buy price and resale value decoded from the ROM for equipment;
+- per-character equipment restrictions and vendor assignment by chapter;
+- new items immediately available in the chest picker;
+- instant search, creation, duplication, deletion and navigation to events;
+- validation of positions, variants and event collisions;
+- semantic editing of encounters, transitions, chests and tile-encoded events;
+- explanation of variants, encounter tables and the real `1/12` or `1/4` rates in the inspector;
+- support for maps shared between Stavery floors;
+- non-destructive saving in a JSON project backward-compatible with versions 0.1, 0.2 and 0.3;
+- a HAL compressor compatible with the commands used by the maps;
+- automatic reconstruction and relocation of the 14 map blocks in bank `$13`;
+- update of the 34 map pointers and the SNES checksum;
+- non-destructive export to a new `.sfc` file verified by re-decompression;
+- injection of types, identifiers, quantities and new positions of existing chests;
+- decoding of stair tables, including the adjacent activation tile;
+- injection of target maps, coordinates and orientations of existing internal stairs;
+- report of the number of chests and stairs actually injected;
+- capacity report and warnings about data that is not injected yet;
+- a standalone Windows executable built with PyInstaller.
 
-La deuxième étape de la feuille de route est engagée : les éléments interactifs portés par la grille sont maintenant visibles et éditables. L’édition des tables détaillées associées, comme le contenu exact des coffres, les destinations d’escaliers et les formations ennemies, reste à compléter. L’injection dans un nouveau ROM nécessite toujours une recompression sûre et un export de patch.
+The second roadmap milestone is underway: grid-carried interactive elements are now visible and editable. Editing their associated detailed tables — exact chest contents, stair destinations and enemy formations — remains to be completed. Injecting into a new ROM still requires safe recompression and patch export.
 
-## Lancer depuis les sources
+## Run from sources
 
-Prérequis : Python 3.11 ou plus récent avec Tk.
+Requirements: Python 3.11 or newer with Tk.
 
 ```powershell
 python -m pip install -e .
 python -m arcana_editor
 ```
 
-L’application détecte automatiquement `Arcana (USA).sfc` dans le dossier courant. Le dump de référence possède le SHA-256 suivant :
+The application automatically detects `Arcana (USA).sfc` in the current folder. The reference dump has the following SHA-256:
 
 ```text
 aac9d6f2b8408e4bbdc83ebbba755428caf8021fefbfac7220fb4c772abd9944
 ```
 
-## Construire le `.exe`
+## Build the `.exe`
 
 ```powershell
 python -m pip install pytest pyinstaller
 .\build.ps1
 ```
 
-Le résultat est `dist\ArcanaMapStudio.exe`. Placez votre propre `Arcana (USA).sfc` à côté de l’exécutable ou utilisez **Fichier > Ouvrir un ROM**.
+The result is `dist\ArcanaMapStudio.exe`. Place your own `Arcana (USA).sfc` next to the executable or use **File > Open ROM**.
 
-## Construire un ROM modifié
+## Build a modified ROM
 
-Utilisez **Fichier > Construire un ROM modifié** ou `Ctrl+B`. L’éditeur recompresse les cartes, les replace dans leur zone d’origine, met à jour les pointeurs et le checksum, puis redécompresse chaque carte du fichier produit pour vérifier l’export. Le dump source n’est jamais écrasé.
+Use **File > Build modified ROM** or `Ctrl+B`. The editor recompresses the maps, places them back in their original area, updates pointers and the checksum, then re-decompresses each map of the produced file to verify the export. The source dump is never overwritten.
 
-La version 0.7.1 reconstruit et relocalise entièrement les tables de coffres et d’escaliers dans les zones libres vérifiées des banques `$18` et `$03`. Elle prend en charge la création et la suppression de coffres, l’ajout d’escaliers, ainsi que la conversion d’une sortie externe en destination de donjon. Les rencontres, objets personnalisés, statistiques et inventaires de vendeurs restent sauvegardés dans le projet mais ne sont pas encore écrits dans le ROM.
+Version 0.7.1 fully rebuilds and relocates the chest and stair tables in the verified free areas of banks `$18` and `$03`. It supports creating and deleting chests, adding stairs, and converting an external exit into a dungeon destination. Encounters, custom items, statistics and vendor inventories remain saved in the project but are not yet written to the ROM.
 
-## Extraire les cartes
+## Extract the maps
 
 ```powershell
 python -m arcana_editor.extract "Arcana (USA).sfc" extracted
 ```
 
-La commande crée un manifeste JSON et 14 grilles binaires décompressées de 1 024 octets. Ces fichiers générés ne doivent pas être publiés sans vérifier vos droits.
+The command creates a JSON manifest and 14 decompressed 1,024-byte binary grids. These generated files must not be published without checking your rights.
 
 ## Tests
 
@@ -95,80 +95,94 @@ La commande crée un manifeste JSON et 14 grilles binaires décompressées de 1 
 python -m pytest
 ```
 
-Les tests indépendants du ROM fonctionnent sur GitHub Actions. Les tests d’intégration sont automatiquement ignorés quand le ROM propriétaire est absent.
+ROM-independent tests run on GitHub Actions. Integration tests are automatically skipped when the proprietary ROM is absent.
 
 ## Architecture
 
-- `src/arcana_editor/rom.py` : en-tête SNES, adressage LoROM, décompression HAL et tables de cartes.
-- `src/arcana_editor/project.py` : modèle de projet non destructif et sérialisation JSON.
-- `src/arcana_editor/app.py` : interface Tkinter.
-- `src/arcana_editor/extract.py` : extraction reproductible des données de cartes.
-- `tests/` : tests unitaires et tests d’intégration locaux.
+- `src/arcana_editor/rom.py`: SNES header, LoROM addressing, HAL decompression and map tables.
+- `src/arcana_editor/project.py`: non-destructive project model and JSON serialization.
+- `src/arcana_editor/app.py`: Tkinter interface.
+- `src/arcana_editor/extract.py`: reproducible extraction of map data.
+- `tests/`: unit tests and local integration tests.
 
-## Décompilation
+## Decompilation
 
-Une désassemblage 65c816 annotée existe déjà dans le projet public `SarahShinespark/arcana-disassembly`. Elle constitue une excellente référence technique, mais aucune licence explicite n’y était affichée lors de la création de ce dépôt. Son code n’est donc pas recopié ici. Arcana Map Studio réimplémente uniquement les formats nécessaires à partir du comportement observé et des tables du ROM.
+An annotated 65c816 disassembly already exists in the public `SarahShinespark/arcana-disassembly` project. It is an excellent technical reference, but no explicit license was displayed when this repository was created. Its code is therefore not copied here. Arcana Map Studio only reimplements the required formats from observed behavior and the ROM tables.
 
-Feuille de route :
+Roadmap:
 
-1. **partiellement livré en 0.6** — compresseur HAL, reconstruction ROM et injection des cartes ; export BPS/IPS et injection des autres bases encore à faire ;
-2. **avancée en 0.7.1** — tables de coffres et d’escaliers reconstruites avec création, suppression, relocation et conversion des sorties externes ; rencontres encore à finaliser ;
-3. **en cours** — aperçu des murs et couloirs en perspective livré en 0.3 ; extraction et rendu des véritables tuiles SNES encore à réaliser ;
-4. **livré en 0.5 au niveau projet — Base de données d’objets** : édition et création, statistiques, prix, vendeurs et disponibilité automatique dans les coffres ; l’injection ROM attend le constructeur ;
-5. édition des villes, ennemis, statistiques générales et dialogues ;
-6. pipeline de reconstruction vérifiable du ROM à partir d’un dump fourni localement ;
-7. **partiellement livré** — historique annuler/rétablir et outils de dessin façon RPG Maker ; calques, sélection avancée et validation restent à faire.
+1. **partially delivered in 0.6** — HAL compressor, ROM reconstruction and map injection; BPS/IPS export and injection of the other databases still to do;
+2. **advanced in 0.7.1** — chest and stair tables rebuilt with creation, deletion, relocation and external exit conversion; encounters still to be finalized;
+3. **in progress** — perspective wall and corridor preview delivered in 0.3; extraction and rendering of real SNES tiles still to be done;
+4. **delivered in 0.5 at project level — Item database**: editing and creation, statistics, prices, vendors and automatic availability in chests; ROM injection awaits the builder;
+5. editing of towns, enemies, general statistics and dialogue;
+6. **planned — Monster editor**: an RPG Maker-style enemy database allowing you to load a monster image (converted to the SNES tile format), configure stats, attacks, spells, elemental affinities and rewards, preview the sprite in the editor and inject the tables into the ROM;
+7. verifiable ROM reconstruction pipeline from a locally provided dump;
+8. **partially delivered** — undo/redo history and RPG Maker-style drawing tools; layers, advanced selection and validation remain to be done.
 
-## Module Base de données d’objets — plan de match
+## Item database module — roadmap
 
-Le module prend la forme d’une base de données inspirée de RPG Maker, accessible depuis la barre d’outils et organisée par catégories : objets, armes, armures, boucliers, accessoires et cartes. La version 0.5 réalise l’édition au niveau du projet ; l’écriture de ces tables dans un ROM modifié reste liée au futur constructeur.
+The module takes the form of an RPG Maker-inspired database, accessible from the toolbar and organized by categories: items, weapons, armors, shields, accessories and cards. Version 0.5 delivers editing at the project level; writing these tables into a modified ROM is tied to the future builder.
 
-### Édition et création
+### Editing and creation
 
-- modifier le nom, la description, la catégorie, l’identifiant et l’icône logique d’un objet existant ;
-- dupliquer un objet comme point de départ ;
-- créer un objet dans un emplacement ROM libre ou étendre les tables lorsque le constructeur de ROM sera disponible ;
-- détecter les identifiants libres, doublons, limites de texte et références cassées ;
-- conserver les créations dans le projet sans modifier le dump original ;
-- rendre immédiatement tout objet existant ou créé disponible dans le sélecteur de contenu des coffres.
+- modify the name, description, category, identifier and logical icon of an existing item;
+- duplicate an item as a starting point;
+- create an item in a free ROM slot or extend the tables when the ROM builder is available;
+- detect free identifiers, duplicates, text limits and broken references;
+- keep creations in the project without modifying the original dump;
+- immediately make any existing or created item available in the chest contents picker.
 
-### Statistiques d’équipement
+### Equipment statistics
 
-Pour les armes, armures, boucliers et accessoires, l’éditeur exposera les statistiques réellement prises en charge par le jeu :
+For weapons, armors, shields and accessories, the editor will expose the statistics actually supported by the game:
 
-- attaque, défense et défense magique ;
-- bonus ou pénalités de caractéristiques identifiés dans les tables du ROM ;
-- personnages ou classes autorisés à équiper l’objet ;
-- effets spéciaux, résistances et propriétés maudites lorsque leur format aura été confirmé ;
-- prix d’achat, valeur de revente et indicateur « non vendable » ;
-- comparaison avec un autre équipement et aperçu de l’impact sur les statistiques.
+- attack, defense and magic defense;
+- attribute bonuses or penalties identified in the ROM tables;
+- characters or classes allowed to equip the item;
+- special effects, resistances and cursed properties once their format is confirmed;
+- buy price, resale value and "unsellable" flag;
+- comparison with another piece of equipment and preview of the stat impact.
 
-### Vendeurs et disponibilité
+### Vendors and availability
 
-- liste des magasins et vendeurs présents dans les villes ;
-- cases à cocher pour choisir quels vendeurs proposent l’objet ;
-- prix global par défaut et surcharge facultative par vendeur si le moteur du jeu le permet ;
-- ordre d’affichage dans chaque boutique ;
-- conditions de disponibilité liées au chapitre ou à la progression lorsqu’elles existent ;
-- avertissement lorsqu’un magasin dépasse la capacité de sa table ROM.
+- list of shops and vendors present in towns;
+- checkboxes to choose which vendors sell the item;
+- default global price and optional per-vendor override if the game engine allows it;
+- display order in each shop;
+- availability conditions tied to chapter or progression where they exist;
+- warning when a shop exceeds the capacity of its ROM table.
 
-### Intégration avec les coffres
+### Chest integration
 
-Le catalogue des coffres utilisera une source unique partagée avec la base de données. Une création ou un renommage sera donc visible immédiatement dans l’éditeur d’événements. Les références seront stockées par catégorie et identifiant, et non uniquement par nom, pour éviter de casser les coffres lors d’un renommage.
+The chest catalog will use a single source shared with the database. A creation or rename is therefore immediately visible in the event editor. References are stored by category and identifier, not only by name, to avoid breaking chests on rename.
 
-### Étapes techniques
+### Technical steps
 
-1. décoder les tables de prix, statistiques, restrictions d’équipement et inventaires des boutiques ;
-2. étendre `GameItem` et le format de projet avec ces données sans casser les projets existants ;
-3. créer l’interface Base de données avec recherche, filtres, duplication et validation ;
-4. relier les vendeurs et le sélecteur de coffres au catalogue du projet ;
-5. ajouter l’allocation d’identifiants et la création d’objets ;
-6. injecter les tables modifiées via le futur constructeur de ROM et vérifier le résultat dans un émulateur.
+1. decode the price, statistics, equipment restriction and shop inventory tables;
+2. extend `GameItem` and the project format with this data without breaking existing projects;
+3. build the Database interface with search, filters, duplication and validation;
+4. link vendors and the chest picker to the project catalog;
+5. add identifier allocation and item creation;
+6. inject the modified tables through the future ROM builder and verify the result in an emulator.
 
-## Légalité
+## Monster editor module — roadmap
 
-Le ROM, les graphismes, textes, musiques et autres ressources d’Arcana appartiennent à leurs ayants droit. Ce dépôt ne doit contenir ni ROM ni contenu extrait. L’utilisateur doit fournir légalement son propre dump. Le logiciel génère des projets et, à terme, des patchs ne contenant pas le jeu complet.
+A future module dedicated to battle enemies, on the model of the RPG Maker enemy database:
 
-## Licence
+- enemy list with search, filters, duplication and deletion;
+- editable statistics: HP, attack, defense, magic, speed and rewards (experience, gold, drops);
+- **monster image loading**: import a PNG/BMP image from the editor, preview it in the battle layout, and — as a longer-term goal — convert it to the SNES 4bpp tile format for ROM injection;
+- attack and AI configuration: normal attacks, spells, attack patterns and conditions;
+- elemental affinities, resistances and status immunities where the ROM format allows;
+- assignment to encounter groups and dungeon zones;
+- storage in the project first, then table injection through the ROM builder;
+- verification of the result in an emulator.
 
-Le code original d’Arcana Map Studio est distribué sous licence MIT. Cette licence ne s’applique pas au jeu Arcana ni à ses ressources.
+## Legality
+
+The ROM, graphics, texts, music and other Arcana resources belong to their rightsholders. This repository must contain neither a ROM nor extracted content. The user must legally provide their own dump. The software produces projects and, eventually, patches that do not contain the full game.
+
+## License
+
+The original Arcana Map Studio code is distributed under the MIT license. This license does not apply to the Arcana game or its resources.
