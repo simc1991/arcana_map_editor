@@ -4,12 +4,13 @@ from dataclasses import dataclass, field
 import json
 from pathlib import Path
 
+from .encounters import EncounterGroup
 from .events import MapEvent, default_properties, event_key
 from .items import GameItem
 from .rendering import event_kind
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
-PROJECT_FORMAT = 5
+PROJECT_FORMAT = 6
 
 
 @dataclass
@@ -18,12 +19,52 @@ class ArcanaProject:
     maps: dict[int, bytearray]
     event_metadata: dict[str, dict] = field(default_factory=dict)
     item_overrides: dict[str, dict] = field(default_factory=dict)
+    encounter_overrides: dict[str, dict] = field(default_factory=dict)
     path: Path | None = None
     dirty: bool = False
 
     @classmethod
     def from_rom(cls, rom: ArcanaRom) -> "ArcanaProject":
         return cls(rom=rom, maps={address: bytearray(data) for address, data in rom.unique_maps().items()})
+
+    @property
+    def encounter_groups(self) -> tuple[EncounterGroup, ...]:
+        merged: dict[tuple[int, int], EncounterGroup] = {(group.chapter, group.group_id): group for group in self.rom.encounter_groups}
+        for key, payload in self.encounter_overrides.items():
+            chapter, group_id = (int(part) for part in key.split(":"))
+            enemy_ids = tuple(int(value) for value in payload.get("enemy_ids", ()))
+            names = self.rom.enemy_names
+            merged[(chapter, group_id)] = EncounterGroup(
+                chapter, group_id, int(payload.get("zone", 0)), enemy_ids,
+                tuple(names[enemy_id] if enemy_id < len(names) else f"Ennemi ${enemy_id:02X}" for enemy_id in enemy_ids),
+                int(payload.get("flags", 0)),
+            )
+        return tuple(sorted(merged.values(), key=lambda group: (group.chapter, group.group_id)))
+
+    def save_encounter_group(self, group: EncounterGroup) -> None:
+        if not 0 <= group.group_id <= 0x0F:
+            raise ValueError("L’identifiant de groupe doit être compris entre 0 et 15")
+        if not 0 <= group.zone <= 0xFF:
+            raise ValueError("La zone doit être comprise entre 0 et 255")
+        if not group.enemy_ids or len(group.enemy_ids) > 0x0F:
+            raise ValueError("Un groupe doit contenir entre 1 et 15 ennemis")
+        if any(not 0 <= enemy_id <= 0xFF for enemy_id in group.enemy_ids):
+            raise ValueError("Un ennemi du groupe est hors limites")
+        self.encounter_overrides[f"{group.chapter}:{group.group_id}"] = {
+            "zone": group.zone,
+            "enemy_ids": list(group.enemy_ids),
+            "flags": group.flags,
+        }
+        self.dirty = True
+
+    def remove_encounter_override(self, chapter: int, group_id: int) -> None:
+        self.encounter_overrides.pop(f"{chapter}:{group_id}", None)
+        self.dirty = True
+
+    def encounters_for_map(self, map_index: int) -> tuple[EncounterGroup, ...]:
+        from .encounters import chapter_for_map
+        chapter = chapter_for_map(map_index)
+        return tuple(group for group in self.encounter_groups if group.chapter == chapter)
 
     def map_for_entry(self, index: int) -> bytearray:
         return self.maps[self.rom.maps[index].snes_address]
@@ -152,11 +193,12 @@ class ArcanaProject:
         return {
             "format": PROJECT_FORMAT,
             "game": "Arcana (USA)",
-            "editor_version": "0.7.1",
+            "editor_version": "0.8",
             "base_rom_sha256": self.rom.info.sha256,
             "maps": {f"{address:06X}": list(tiles) for address, tiles in sorted(self.maps.items())},
             "events": self.event_metadata,
             "items": self.item_overrides,
+            "encounters": self.encounter_overrides,
         }
 
     def save(self, path: str | Path | None = None) -> None:
@@ -171,7 +213,7 @@ class ArcanaProject:
     def load(cls, rom: ArcanaRom, path: str | Path) -> "ArcanaProject":
         source = Path(path)
         payload = json.loads(source.read_text(encoding="utf-8"))
-        if payload.get("format") not in (1, 2, 3, 4, PROJECT_FORMAT):
+        if payload.get("format") not in (1, 2, 3, 4, 5, PROJECT_FORMAT):
             raise RomError("Version de projet non prise en charge")
         if payload.get("base_rom_sha256") != rom.info.sha256:
             raise RomError("Le projet ne correspond pas au ROM chargé")
@@ -185,4 +227,7 @@ class ArcanaProject:
         items = payload.get("items", {})
         if not isinstance(items, dict):
             raise RomError("Base de données d’objets invalide")
-        return cls(rom=rom, maps=maps, event_metadata=metadata, item_overrides=items, path=source)
+        encounters = payload.get("encounters", {})
+        if not isinstance(encounters, dict):
+            raise RomError("Groupes de rencontres invalides")
+        return cls(rom=rom, maps=maps, event_metadata=metadata, item_overrides=items, encounter_overrides=encounters, path=source)

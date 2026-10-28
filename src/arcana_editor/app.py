@@ -10,13 +10,14 @@ from .builder import build_rom
 from .dungeon_view import DIRECTION_NAMES, move_position, relative_position, tile_at
 from .event_editor import EventEditor
 from .events import MapEvent, default_properties
+from .encounter_database import EncounterDatabase
 from .item_database import ItemDatabase
 from .project import ArcanaProject
 from .rendering import event_kind, is_walkable, tile_details, tile_style
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
 APP_TITLE = "Arcana Map Studio"
-APP_VERSION = "0.7.1"
+APP_VERSION = "0.8"
 PALETTE = (
     (0x00, "Mur / vide"), (0x10, "Rencontre A"), (0x11, "Rencontre B"),
     (0x20, "Rencontre fréquente"), (0x30, "Sol sûr"), (0x40, "Escalier A"),
@@ -99,6 +100,7 @@ class ArcanaEditor(tk.Tk):
             view_menu.add_radiobutton(label=label, variable=self.zoom, value=size, command=self._draw_map)
         database_menu = tk.Menu(menu, tearoff=False)
         database_menu.add_command(label="Objets et équipements…", command=self.open_item_database)
+        database_menu.add_command(label="Groupes de rencontres…", command=self.open_encounter_database)
         help_menu = tk.Menu(menu, tearoff=False)
         help_menu.add_command(label="À propos", command=self._about)
         menu.add_cascade(label="Fichier", menu=file_menu)
@@ -355,6 +357,17 @@ class ArcanaEditor(tk.Tk):
         self._update_title()
         self.status.set(f"Base de données mise à jour — {len(self.project.items)} entrées disponibles")
 
+    def open_encounter_database(self) -> None:
+        if not self.project:
+            messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
+            return
+        EncounterDatabase(self, self.project, self._encounter_database_changed)
+
+    def _encounter_database_changed(self) -> None:
+        self._refresh_events()
+        self._update_title()
+        self.status.set(f"Groupes de rencontres mis à jour — {len(self.project.encounter_groups)} groupes disponibles")
+
     def export_rom(self) -> None:
         if not self.project:
             messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
@@ -378,6 +391,9 @@ class ArcanaEditor(tk.Tk):
             f"Données compressées : {report.compressed_bytes} / {report.available_bytes} octets\n"
             f"Coffres injectés : {report.treasures_written}\n"
             f"Escaliers injectés : {report.stairs_written}\n"
+            f"Objets injectés : {report.items_written}\n"
+            f"Objets en boutique : {report.shop_slots_written}\n"
+            f"Groupes de rencontres : {report.encounters_written}\n"
             f"Checksum SNES : ${report.checksum:04X}\n\n"
             f"Fichier : {report.output_path}"
         )
@@ -559,7 +575,7 @@ class ArcanaEditor(tk.Tk):
             value = self.tile_value.get() if event_kind(self.tile_value.get()) else 0x70
             found = MapEvent(address, x, y, value, properties=default_properties(value))
         self.selected_x, self.selected_y = x, y
-        EventEditor(self, found, self._save_edited_event, self.project.items, self.project.rom.encounters_for_map(self.entry_index), tuple((entry.index, entry.name) for entry in self.project.rom.maps))
+        EventEditor(self, found, self._save_edited_event, self.project.items, self.project.encounters_for_map(self.entry_index), tuple((entry.index, entry.name) for entry in self.project.rom.maps))
 
     def _pick_at(self, x: int, y: int) -> None:
         if not self.project:
@@ -618,14 +634,14 @@ class ArcanaEditor(tk.Tk):
         x, y = self._find_free_event_position(self.selected_x, self.selected_y)
         address = self.project.rom.maps[self.entry_index].snes_address
         event = MapEvent(address, x, y, 0x70, properties=default_properties(0x70))
-        EventEditor(self, event, self._save_edited_event, self.project.items, self.project.rom.encounters_for_map(self.entry_index), tuple((entry.index, entry.name) for entry in self.project.rom.maps))
+        EventEditor(self, event, self._save_edited_event, self.project.items, self.project.encounters_for_map(self.entry_index), tuple((entry.index, entry.name) for entry in self.project.rom.maps))
 
     def _edit_selected_event(self) -> None:
         event = self._selected_event()
         if not event:
             messagebox.showinfo(APP_TITLE, "Sélectionnez d’abord un événement dans la liste ou sur la carte.", parent=self)
             return
-        EventEditor(self, event, self._save_edited_event, self.project.items, self.project.rom.encounters_for_map(self.entry_index), tuple((entry.index, entry.name) for entry in self.project.rom.maps))
+        EventEditor(self, event, self._save_edited_event, self.project.items, self.project.encounters_for_map(self.entry_index), tuple((entry.index, entry.name) for entry in self.project.rom.maps))
 
     def _save_edited_event(self, event: MapEvent, old_x: int, old_y: int) -> None:
         if not self.project:

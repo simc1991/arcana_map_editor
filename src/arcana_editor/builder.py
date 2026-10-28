@@ -5,7 +5,31 @@ from pathlib import Path
 import struct
 
 from .compression import compress_hal
-from .encounters import chapter_for_map
+from .encounters import ENCOUNTER_POINTER_TABLE_PC, chapter_for_map
+from .items import (
+    AMULET_DEFENSE_PC,
+    AMULET_MAGIC_DEFENSE_PC,
+    ARMOR_DEFENSE_PC,
+    CARD_NAMES_PC,
+    CARD_RECORD_SIZE,
+    CHARACTER_BITS,
+    EQUIPMENT_NAMES_PC,
+    EQUIPMENT_RECORD_SIZE,
+    EQUIP_FLAGS_AMULETS_PC,
+    EQUIP_FLAGS_ARMOR_PC,
+    EQUIP_FLAGS_RINGS_PC,
+    EQUIP_FLAGS_WEAPONS_PC,
+    ITEM_NAMES_PC,
+    ITEM_RECORD_SIZE,
+    PRICE_WEAPONS_PC,
+    RING_DEFENSE_PC,
+    SHOP_MAX_ITEMS,
+    SHOP_POINTER_TABLE_PC,
+    SHOP_SIZE_TABLE_PC,
+    VENDORS,
+    WEAPON_POWER_PC,
+    read_shop_lists,
+)
 from .project import ArcanaProject
 from .rom import MAP_POINTER_TABLE_PC, STAIR_POINTER_TABLE_PC, TREASURE_POINTER_TABLE_PC, RomError, decompress_hal
 
@@ -24,7 +48,10 @@ class BuildReport:
     checksum: int
     treasures_written: int
     stairs_written: int
-    warnings: tuple[str, ...]
+    items_written: int = 0
+    shop_slots_written: int = 0
+    encounters_written: int = 0
+    warnings: tuple[str, ...] = ()
 
 
 def _update_checksum(rom: bytearray) -> int:
@@ -55,7 +82,7 @@ def _treasure_payload(properties: dict) -> tuple[int, int]:
     return treasure_type, value
 
 
-def _rebuild_treasures(project: ArcanaProject, rom: bytearray) -> int:
+def _rebuild_treasures(project: ArcanaProject, rom: bytearray) -> tuple[int, int]:
     overrides = {}
     deleted_sources = set()
     new_entries = []
@@ -104,10 +131,10 @@ def _rebuild_treasures(project: ArcanaProject, rom: bytearray) -> int:
             raise RomError("La banque $18 ne contient plus assez d’espace pour les coffres")
         struct.pack_into("<H", rom, cursor, 0xFFFF)
         cursor += 2
-    return sum(len(entries) for entries in by_chapter.values())
+    return sum(len(entries) for entries in by_chapter.values()), cursor
 
 
-def _rebuild_stairs(project: ArcanaProject, rom: bytearray) -> int:
+def _rebuild_stairs(project: ArcanaProject, rom: bytearray) -> tuple[int, int]:
     direction_values = {"Nord": 0, "Est": 2, "Sud": 4, "Ouest": 6}
     overrides = {}
     deleted_sources = set()
@@ -182,7 +209,138 @@ def _rebuild_stairs(project: ArcanaProject, rom: bytearray) -> int:
         total += len(original_entries)
     if overrides:
         raise RomError("Un escalier modifié ne correspond plus à une entrée ROM source")
-    return total
+    return total, cursor
+
+
+def _rebuild_encounters(project: ArcanaProject, rom: bytearray, cursor: int) -> tuple[int, int]:
+    by_chapter: dict[int, list] = {chapter: [] for chapter in range(1, 6)}
+    for group in project.encounter_groups:
+        if not group.enemy_ids:
+            raise RomError(f"Le groupe de rencontres {group.chapter}:{group.group_id:X} est vide")
+        if not 0 <= group.group_id <= 0x0F or len(group.enemy_ids) > 0x0F:
+            raise RomError("Un groupe de rencontres dépasse la capacité du moteur")
+        if not 0 <= group.zone <= 0xFF:
+            raise RomError("Zone de rencontre hors limites")
+        if any(not 0 <= enemy_id <= 0xFF for enemy_id in group.enemy_ids):
+            raise RomError("Un ennemi de groupe de rencontres est hors limites")
+        by_chapter[group.chapter].append(group)
+    total = 0
+    for chapter in range(1, 6):
+        pointer = 0x8000 | (cursor & 0x7FFF)
+        struct.pack_into("<H", rom, ENCOUNTER_POINTER_TABLE_PC + (chapter - 1) * 2, pointer)
+        for group in by_chapter[chapter]:
+            entry = bytes([group.flags | len(group.enemy_ids), group.zone, *group.enemy_ids])
+            if cursor + len(entry) + 1 > TREASURE_RELOCATION_END:
+                raise RomError("La banque $18 ne contient plus assez d’espace pour les rencontres")
+            rom[cursor:cursor + len(entry)] = entry
+            cursor += len(entry)
+            total += 1
+        rom[cursor] = 0x00
+        cursor += 1
+    return total, cursor
+
+
+def _rebuild_shops(project: ArcanaProject, rom: bytearray, cursor: int) -> tuple[int, int]:
+    original_lists = read_shop_lists(project.rom.data)
+    total = 0
+    for chapter, label in enumerate(VENDORS):
+        assigned = {item.item_id for item in project.items if item.is_equipment and label in item.vendors}
+        previous = original_lists[chapter]
+        ordered = [item_id for item_id in previous if item_id in assigned]
+        ordered += sorted(assigned - set(previous))
+        if len(ordered) > SHOP_MAX_ITEMS:
+            raise RomError(f"La boutique « {label} » dépasse la capacité de {SHOP_MAX_ITEMS} objets")
+        if cursor + 2 * len(ordered) > STAIR_RELOCATION_END:
+            raise RomError("La banque $03 ne contient plus assez d’espace pour les boutiques")
+        pointer = 0x8000 | (cursor & 0x7FFF)
+        struct.pack_into("<H", rom, SHOP_POINTER_TABLE_PC + chapter * 2, pointer)
+        struct.pack_into("<H", rom, SHOP_SIZE_TABLE_PC + chapter * 2, len(ordered))
+        if ordered:
+            struct.pack_into(f"<{len(ordered)}H", rom, cursor, *ordered)
+        cursor += 2 * len(ordered)
+        total += len(ordered)
+    return total, cursor
+
+
+def _item_name_table(category: str) -> tuple[int, int, int] | None:
+    if category == "Objet":
+        return ITEM_NAMES_PC, ITEM_RECORD_SIZE, 17
+    if category == "Carte":
+        return CARD_NAMES_PC, CARD_RECORD_SIZE, 7
+    if category in ("Arme", "Armure", "Bouclier", "Accessoire"):
+        return EQUIPMENT_NAMES_PC, EQUIPMENT_RECORD_SIZE, 120
+    return None
+
+
+def _expected_category(item_id: int) -> str:
+    if item_id <= 40:
+        return "Arme"
+    if item_id <= 80:
+        return "Armure"
+    if item_id <= 91:
+        return "Bouclier"
+    return "Accessoire"
+
+
+def _inject_items(project: ArcanaProject, rom: bytearray, warnings: list[str]) -> int:
+    injected = 0
+    warned_attributes = False
+    warned_vendors = False
+    warned_category = False
+    for item in project.items:
+        table = _item_name_table(item.category)
+        if table is None:
+            continue
+        base, record_size, max_id = table
+        if not 1 <= item.item_id <= max_id:
+            warnings.append(f"{item.display} : identifiant hors des tables ROM — conservé dans le projet uniquement.")
+            continue
+        try:
+            name_bytes = item.name.encode("ascii")
+        except UnicodeEncodeError:
+            raise RomError(f"Le nom de « {item.name} » contient des caractères non injectables dans le ROM")
+        if len(name_bytes) > record_size:
+            raise RomError(f"Le nom « {item.name} » dépasse la limite de {record_size} caractères du ROM")
+        offset = base + item.item_id * record_size
+        rom[offset:offset + record_size] = name_bytes.ljust(record_size, b"\x00")
+        if item.is_equipment:
+            if not warned_category and item.category != _expected_category(item.item_id):
+                warnings.append("La catégorie d’un équipement ne correspond pas à la plage de son identifiant — le jeu la détermine par l’identifiant.")
+                warned_category = True
+            if not 0 <= item.price <= 0xFFFF or not 0 <= item.defense <= 0xFFFF or not 0 <= item.attack <= 0xFFFF:
+                raise RomError(f"Statistiques hors limites pour {item.name}")
+            if not 0 <= item.magic_defense <= 0xFF:
+                raise RomError(f"Défense magique hors limites pour {item.name}")
+            struct.pack_into("<H", rom, PRICE_WEAPONS_PC + item.item_id * 2, item.price)
+            flags = 0
+            for character, bit in CHARACTER_BITS:
+                if character in item.equippable_by:
+                    flags |= bit
+            if item.item_id <= 40:
+                struct.pack_into("<H", rom, WEAPON_POWER_PC + item.item_id * 2, item.attack)
+                rom[EQUIP_FLAGS_WEAPONS_PC + item.item_id] = flags
+            elif item.item_id <= 80:
+                index = item.item_id - 41
+                struct.pack_into("<H", rom, ARMOR_DEFENSE_PC + index * 2, item.defense)
+                rom[EQUIP_FLAGS_ARMOR_PC + index] = flags
+            elif item.item_id <= 100:
+                index = item.item_id - 81
+                struct.pack_into("<H", rom, AMULET_DEFENSE_PC + index * 2, item.defense)
+                rom[AMULET_MAGIC_DEFENSE_PC + index] = item.magic_defense
+                rom[EQUIP_FLAGS_AMULETS_PC + index] = flags
+            else:
+                index = item.item_id - 101
+                struct.pack_into("<H", rom, RING_DEFENSE_PC + index * 2, item.defense)
+                rom[AMULET_MAGIC_DEFENSE_PC + 20 + index] = item.magic_defense
+                rom[EQUIP_FLAGS_RINGS_PC + index] = flags
+            if not warned_attributes and any((item.strength, item.intelligence, item.endurance, item.agility)):
+                warnings.append("Les bonus de caractéristiques des équipements ne sont pas encore localisés dans le ROM — conservés dans le projet.")
+                warned_attributes = True
+        elif item.vendors and not warned_vendors:
+            warnings.append("Les vendeurs ne proposent que des équipements — les affectations sur les objets/cartes sont conservées dans le projet.")
+            warned_vendors = True
+        injected += 1
+    return injected
 
 
 def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
@@ -210,12 +368,13 @@ def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
         cursor += len(data)
     for entry in source.maps:
         struct.pack_into("<H", rom, MAP_POINTER_TABLE_PC + entry.index * 2, relocated[entry.snes_address])
-    treasures_written = _rebuild_treasures(project, rom)
-    stairs_written = _rebuild_stairs(project, rom)
+    treasures_written, bank18_cursor = _rebuild_treasures(project, rom)
+    encounters_written, _ = _rebuild_encounters(project, rom, bank18_cursor)
+    stairs_written, bank03_cursor = _rebuild_stairs(project, rom)
+    shop_slots_written, _ = _rebuild_shops(project, rom, bank03_cursor)
+    warnings: list[str] = []
+    items_written = _inject_items(project, rom, warnings)
     checksum = _update_checksum(rom)
-    warnings = []
-    if project.item_overrides:
-        warnings.append("Les modifications de la base d’objets attendent encore l’injection des tables d’objets et de boutiques.")
     output_path.write_bytes(rom)
     verification = output_path.read_bytes()
     if len(verification) != len(source.data):
@@ -226,4 +385,8 @@ def build_rom(project: ArcanaProject, destination: str | Path) -> BuildReport:
         decoded, _ = decompress_hal(verification, offset, 1025)
         if decoded != bytes(project.maps[entry.snes_address]):
             raise RomError(f"Échec de vérification de la carte {entry.name}")
-    return BuildReport(output_path, len(address_to_data), compressed_total, available, checksum, treasures_written, stairs_written, tuple(warnings))
+    return BuildReport(
+        output_path, len(address_to_data), compressed_total, available, checksum,
+        treasures_written, stairs_written, items_written, shop_slots_written,
+        encounters_written, tuple(warnings),
+    )

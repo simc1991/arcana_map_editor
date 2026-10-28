@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from arcana_editor.items import read_item_catalog
+from arcana_editor.items import read_item_catalog, read_shop_lists
 from arcana_editor.rom import ArcanaRom
 
 ROM = Path(__file__).parents[1] / "Arcana (USA).sfc"
@@ -36,6 +36,11 @@ def test_catalog_is_decoded_from_rom() -> None:
     assert treasure is not None
     assert rom.treasure_properties(treasure)["contenu"] == "Gold"
     assert rom.treasure_properties(treasure)["quantité"] == 300
+    assert dagger.vendors == ["Outfitter — Chapitre 1"]
+    shops = read_shop_lists(rom.data)
+    assert len(shops) == 5
+    assert all(len(listing) > 10 for listing in shops)
+    assert dagger.item_id in shops[0]
 
 
 def test_catalog_display_and_keys() -> None:

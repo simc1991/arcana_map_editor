@@ -71,7 +71,7 @@ class ItemDatabase(tk.Toplevel):
         self._build_form(right)
         footer = ttk.Frame(self, padding=(10, 0, 10, 10))
         footer.pack(fill="x")
-        ttk.Label(footer, text="Les modifications sont enregistrées dans le projet et deviennent disponibles dans les coffres.").pack(side="left")
+        ttk.Label(footer, text="Les modifications sont enregistrées dans le projet, disponibles dans les coffres et injectées dans le ROM construit.").pack(side="left")
         ttk.Button(footer, text="Fermer", command=self.destroy).pack(side="right", padx=(6, 0))
         ttk.Button(footer, text="Enregistrer l’objet", command=self._save_item).pack(side="right")
 
@@ -114,7 +114,7 @@ class ItemDatabase(tk.Toplevel):
         for vendor, variable in self.vendor_vars.items():
             ttk.Checkbutton(vendors, text=vendor, variable=variable).pack(anchor="w", pady=4)
         ttk.Separator(vendors).pack(fill="x", pady=12)
-        ttk.Label(vendors, text="Le prix d’achat défini dans l’onglet Général sera utilisé par les vendeurs sélectionnés. Les inventaires seront injectés par le futur constructeur de ROM.", wraplength=470, justify="left").pack(anchor="w")
+        ttk.Label(vendors, text="Le prix d’achat défini dans l’onglet Général sera utilisé par les vendeurs sélectionnés. Les inventaires sont reconstruits et injectés lors de la construction du ROM.", wraplength=470, justify="left").pack(anchor="w")
 
     def _refresh_list(self, select_key: str | None = None) -> None:
         self.tree.delete(*self.tree.get_children())

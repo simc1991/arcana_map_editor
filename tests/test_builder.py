@@ -6,9 +6,10 @@ import pytest
 
 from arcana_editor.builder import build_rom
 from arcana_editor.compression import compress_hal
+from arcana_editor.encounters import EncounterGroup
 from arcana_editor.events import MapEvent, default_properties
 from arcana_editor.project import ArcanaProject
-from arcana_editor.rom import ArcanaRom, MAP_POINTER_TABLE_PC, decompress_hal, snes_lorom_to_pc
+from arcana_editor.rom import ArcanaRom, MAP_POINTER_TABLE_PC, RomError, decompress_hal, snes_lorom_to_pc
 
 ROM = Path(__file__).parents[1] / "Arcana (USA).sfc"
 
@@ -92,3 +93,40 @@ def test_builder_allocates_new_chest_and_converts_external_exit(tmp_path: Path) 
     assert converted is not None
     assert (converted.destination, converted.target_x, converted.target_y, converted.direction) == (0x0101, 2, 3, 4)
     assert not report.warnings
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
+def test_builder_injects_items_shops_and_encounters(tmp_path: Path) -> None:
+    rom = ArcanaRom(ROM)
+    project = ArcanaProject.from_rom(rom)
+    dagger = next(item for item in project.items if item.name == "Dagger")
+    project.save_item(dagger.clone(
+        name="Dagger Plus", price=250, attack=25, defense=0,
+        equippable_by=["Rooks"], vendors=["Outfitter — Chapitre 1", "Outfitter — Chapitre 2"],
+    ), dagger.key)
+    source_group = next(group for group in project.encounter_groups if group.chapter == 1)
+    project.save_encounter_group(EncounterGroup(1, source_group.group_id, 7, (5, 5, 9), (), source_group.flags))
+    destination = tmp_path / "Arcana Items.sfc"
+    report = build_rom(project, destination)
+    assert report.items_written > 100
+    assert report.shop_slots_written >= 80
+    assert report.encounters_written == len(rom.encounter_groups)
+    rebuilt = ArcanaRom(destination)
+    edited = next(item for item in rebuilt.items if item.name == "Dagger Plus")
+    assert edited.price == 250
+    assert edited.attack == 25
+    assert edited.equippable_by == ["Rooks"]
+    assert edited.vendors == ["Outfitter — Chapitre 1", "Outfitter — Chapitre 2"]
+    rebuilt_group = next(group for group in rebuilt.encounter_groups if group.chapter == 1 and group.group_id == source_group.group_id)
+    assert rebuilt_group.zone == 7
+    assert rebuilt_group.enemy_ids == (5, 5, 9)
+
+
+@pytest.mark.skipif(not ROM.exists(), reason="ROM propriétaire non inclus au dépôt")
+def test_builder_rejects_invalid_item_data(tmp_path: Path) -> None:
+    rom = ArcanaRom(ROM)
+    project = ArcanaProject.from_rom(rom)
+    herbs = next(item for item in project.items if item.key == "Objet:0B")
+    project.save_item(herbs.clone(name="Un nom beaucoup trop long pour le ROM"), herbs.key)
+    with pytest.raises(RomError):
+        build_rom(project, tmp_path / "bad.sfc")

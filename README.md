@@ -4,7 +4,7 @@ Open source map editor and analysis tools for **Arcana (USA)** on the Super Nint
 
 ## Current state
 
-Version `0.7.1` provides:
+Version `0.8` provides:
 
 - validation of the Arcana USA LoROM dump, with or without a 512-byte copier header;
 - SNES header reading, SHA-256 and CRC32;
@@ -46,6 +46,10 @@ Version `0.7.1` provides:
 - decoding of stair tables, including the adjacent activation tile;
 - injection of target maps, coordinates and orientations of existing internal stairs;
 - report of the number of chests and stairs actually injected;
+- injection of item names, prices, equipment stats and equip flags into the ROM tables;
+- an encounter group database with per-chapter editing, enemy selection and zones;
+- reconstruction and relocation of the 5 Outfitter shop inventories in bank `$03`;
+- reconstruction and relocation of the 5 encounter group tables in bank `$18`;
 - capacity report and warnings about data that is not injected yet;
 - a standalone Windows executable built with PyInstaller.
 
@@ -79,7 +83,9 @@ The result is `dist\ArcanaMapStudio.exe`. Place your own `Arcana (USA).sfc` next
 
 Use **File > Build modified ROM** or `Ctrl+B`. The editor recompresses the maps, places them back in their original area, updates pointers and the checksum, then re-decompresses each map of the produced file to verify the export. The source dump is never overwritten.
 
-Version 0.7.1 fully rebuilds and relocates the chest and stair tables in the verified free areas of banks `$18` and `$03`. It supports creating and deleting chests, adding stairs, and converting an external exit into a dungeon destination. Encounters, custom items, statistics and vendor inventories remain saved in the project but are not yet written to the ROM.
+Version 0.7.1 fully rebuilds and relocates the chest and stair tables in the verified free areas of banks `$18` and `$03`. It supports creating and deleting chests, adding stairs, and converting an external exit into a dungeon destination.
+
+Version 0.8 additionally injects the item database and encounter tables: item names, prices, equipment statistics and equip flags are written in place, the five Outfitter inventories are rebuilt and relocated in bank `$03`, and the five encounter group tables are rebuilt and relocated in bank `$18` behind the chest data. Item identifiers outside the original ROM ranges, attribute bonuses and vendor assignments on consumables remain project-only.
 
 ## Extract the maps
 
@@ -112,9 +118,9 @@ An annotated 65c816 disassembly already exists in the public `SarahShinespark/ar
 Roadmap:
 
 1. **partially delivered in 0.6** — HAL compressor, ROM reconstruction and map injection; BPS/IPS export and injection of the other databases still to do;
-2. **advanced in 0.7.1** — chest and stair tables rebuilt with creation, deletion, relocation and external exit conversion; encounters still to be finalized;
+2. **advanced in 0.8** — chest, stair, shop and encounter tables rebuilt with creation, deletion, relocation and external exit conversion; item names, prices, stats and equip flags injected;
 3. **in progress** — perspective wall and corridor preview delivered in 0.3; extraction and rendering of real SNES tiles still to be done;
-4. **delivered in 0.5 at project level — Item database**: editing and creation, statistics, prices, vendors and automatic availability in chests; ROM injection awaits the builder;
+4. **delivered in 0.5/0.8 — Item database**: editing and creation, statistics, prices, vendors and automatic availability in chests; ROM injection delivered in 0.8;
 5. editing of towns, enemies, general statistics and dialogue;
 6. **planned for 0.9 — Monster editor**: an RPG Maker-style enemy database allowing you to load a monster image (converted to the SNES tile format), configure stats, attacks, spells, elemental affinities and rewards, preview the sprite in the editor and inject the tables into the ROM;
 7. verifiable ROM reconstruction pipeline from a locally provided dump;
@@ -122,7 +128,7 @@ Roadmap:
 
 ## Item database module — roadmap
 
-The module takes the form of an RPG Maker-inspired database, accessible from the toolbar and organized by categories: items, weapons, armors, shields, accessories and cards. Version 0.5 delivers editing at the project level; writing these tables into a modified ROM is tied to the future builder.
+The module takes the form of an RPG Maker-inspired database, accessible from the toolbar and organized by categories: items, weapons, armors, shields, accessories and cards. Version 0.5 delivers editing at the project level; version 0.8 writes these tables into a modified ROM.
 
 ### Editing and creation
 
@@ -164,7 +170,7 @@ The chest catalog will use a single source shared with the database. A creation 
 3. build the Database interface with search, filters, duplication and validation;
 4. link vendors and the chest picker to the project catalog;
 5. add identifier allocation and item creation;
-6. inject the modified tables through the future ROM builder and verify the result in an emulator.
+6. inject the modified tables through the ROM builder (delivered in 0.8) and verify the result in an emulator.
 
 ## Monster editor module — roadmap (0.9)
 

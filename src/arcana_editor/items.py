@@ -26,6 +26,10 @@ AMULET_DEFENSE_PC = 0x2E093
 RING_DEFENSE_PC = 0x2E0BB
 AMULET_MAGIC_DEFENSE_PC = 0x2E226
 CHARACTER_BITS = (("Rooks", 0x01), ("Teefa", 0x02), ("Salah", 0x04), ("Darwin", 0x08), ("Axs", 0x10))
+SHOP_SIZE_TABLE_PC = 0x1D2D1
+SHOP_POINTER_TABLE_PC = 0x1D2DB
+SHOP_COUNT = 5
+SHOP_MAX_ITEMS = 0x30
 VENDORS = (
     "Outfitter — Chapitre 1",
     "Outfitter — Chapitre 2",
@@ -69,7 +73,9 @@ class GameItem:
         return self.category in EQUIPMENT_CATEGORIES
 
     def clone(self, **changes: object) -> "GameItem":
-        return replace(self, equippable_by=list(self.equippable_by), vendors=list(self.vendors), **changes)
+        changes.setdefault("equippable_by", list(self.equippable_by))
+        changes.setdefault("vendors", list(self.vendors))
+        return replace(self, **changes)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -78,6 +84,16 @@ class GameItem:
     def from_dict(cls, payload: dict) -> "GameItem":
         fields = cls.__dataclass_fields__
         return cls(**{key: value for key, value in payload.items() if key in fields})
+
+
+def read_shop_lists(data: bytes) -> tuple[tuple[int, ...], ...]:
+    pointers = struct.unpack_from(f"<{SHOP_COUNT}H", data, SHOP_POINTER_TABLE_PC)
+    sizes = struct.unpack_from(f"<{SHOP_COUNT}H", data, SHOP_SIZE_TABLE_PC)
+    lists = []
+    for index, pointer in enumerate(pointers):
+        offset = 0x18000 + (pointer & 0x7FFF)
+        lists.append(tuple(struct.unpack_from(f"<{sizes[index]}H", data, offset)))
+    return tuple(lists)
 
 
 def _read_fixed_names(data: bytes, offset: int, record_size: int, count: int) -> list[str]:
@@ -130,6 +146,7 @@ def read_item_catalog(data: bytes) -> tuple[GameItem, ...]:
     catalog = [GameItem("Monnaie", 0, "Gold")]
     consumables = _read_fixed_names(data, ITEM_NAMES_PC, ITEM_RECORD_SIZE, ITEM_COUNT)
     catalog.extend(GameItem("Objet", item_id, name) for item_id, name in enumerate(consumables) if item_id and name)
+    shops = read_shop_lists(data)
     equipment = _read_fixed_names(data, EQUIPMENT_NAMES_PC, EQUIPMENT_RECORD_SIZE, EQUIPMENT_COUNT)
     for item_id, name in enumerate(equipment):
         if not item_id or not name:
@@ -144,9 +161,11 @@ def read_item_catalog(data: bytes) -> tuple[GameItem, ...]:
             category = "Accessoire"
         price = _price(data, category, item_id)
         attack, defense, magic_defense, characters = _equipment_stats(data, category, item_id)
+        vendors = [VENDORS[index] for index, listing in enumerate(shops) if item_id in listing]
         catalog.append(GameItem(
             category, item_id, name, price=price, resale_value=price // 2,
             attack=attack, defense=defense, magic_defense=magic_defense, equippable_by=characters,
+            vendors=vendors,
         ))
     cards = _read_fixed_names(data, CARD_NAMES_PC, CARD_RECORD_SIZE, CARD_COUNT)
     catalog.extend(GameItem("Carte", item_id, name) for item_id, name in enumerate(cards) if item_id and name)

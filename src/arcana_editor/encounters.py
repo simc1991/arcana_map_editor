@@ -17,6 +17,7 @@ class EncounterGroup:
     zone: int
     enemy_ids: tuple[int, ...]
     enemy_names: tuple[str, ...]
+    flags: int = 0
 
     @property
     def display(self) -> str:
@@ -24,7 +25,7 @@ class EncounterGroup:
         return f"Groupe ${self.group_id:X} — Zone ${self.zone:02X} — {enemies}"
 
 
-def _enemy_names(data: bytes) -> tuple[str, ...]:
+def enemy_names(data: bytes) -> tuple[str, ...]:
     names = []
     for index in range(ENEMY_COUNT):
         raw = data[ENEMY_NAMES_PC + index * ENEMY_RECORD_SIZE:ENEMY_NAMES_PC + (index + 1) * ENEMY_RECORD_SIZE]
@@ -33,12 +34,13 @@ def _enemy_names(data: bytes) -> tuple[str, ...]:
 
 
 def read_encounter_groups(data: bytes) -> tuple[EncounterGroup, ...]:
-    names = _enemy_names(data)
+    names = enemy_names(data)
     pointers = struct.unpack_from(f"<{ENCOUNTER_CHAPTERS}H", data, ENCOUNTER_POINTER_TABLE_PC)
+    starts = [0xC0000 + (pointer & 0x7FFF) for pointer in pointers]
     groups = []
-    for chapter, pointer in enumerate(pointers, 1):
-        offset = 0xC0000 + (pointer & 0x7FFF)
-        end = 0xC0000 + ((pointers[chapter] & 0x7FFF) if chapter < ENCOUNTER_CHAPTERS else 0x1270)
+    for chapter, offset in enumerate(starts, 1):
+        fallback = 0xC1270 if offset < 0xC1270 else len(data)
+        end = min((other for other in starts if other > offset), default=fallback)
         group_id = 0
         while offset < end and group_id < 16:
             count = data[offset] & 0x0F
@@ -46,8 +48,8 @@ def read_encounter_groups(data: bytes) -> tuple[EncounterGroup, ...]:
                 break
             zone = data[offset + 1]
             enemy_ids = tuple(data[offset + 2:offset + 2 + count])
-            enemy_names = tuple(names[enemy_id] if enemy_id < len(names) else f"Ennemi ${enemy_id:02X}" for enemy_id in enemy_ids)
-            groups.append(EncounterGroup(chapter, group_id, zone, enemy_ids, enemy_names))
+            names_in_group = tuple(names[enemy_id] if enemy_id < len(names) else f"Ennemi ${enemy_id:02X}" for enemy_id in enemy_ids)
+            groups.append(EncounterGroup(chapter, group_id, zone, enemy_ids, names_in_group, data[offset] & 0xF0))
             offset += count + 2
             group_id += 1
     return tuple(groups)
