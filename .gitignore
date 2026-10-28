@@ -9,3 +9,5 @@ Arcana (USA).sfc
 **/__pycache__/
 *.egg-info/
 /extracted/
+/tools/
+/Arcana-PC/

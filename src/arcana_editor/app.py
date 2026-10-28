@@ -15,13 +15,14 @@ from .encounter_database import EncounterDatabase
 from .item_database import ItemDatabase
 from .monster_database import MonsterDatabase
 from .patches import build_ips_patch
+from .pc_package import build_pc_package
 from .spell_database import SpellDatabase
 from .project import ArcanaProject
 from .rendering import event_kind, is_walkable, tile_details, tile_style
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
 APP_TITLE = "Arcana Map Studio"
-APP_VERSION = "1.0"
+APP_VERSION = "1.1"
 PALETTE = (
     (0x00, "Mur / vide"), (0x10, "Rencontre A"), (0x11, "Rencontre B"),
     (0x20, "Rencontre fréquente"), (0x30, "Sol sûr"), (0x40, "Escalier A"),
@@ -92,6 +93,7 @@ class ArcanaEditor(tk.Tk):
         file_menu.add_separator()
         file_menu.add_command(label="Construire un ROM modifié…", accelerator="Ctrl+B", command=self.export_rom)
         file_menu.add_command(label="Exporter un patch IPS…", command=self.export_patch)
+        file_menu.add_command(label="Construire un exécutable PC…", command=self.export_pc_package)
         file_menu.add_separator()
         file_menu.add_command(label="Quitter", command=self._close)
         edit_menu = tk.Menu(menu, tearoff=False)
@@ -423,6 +425,32 @@ class ArcanaEditor(tk.Tk):
             messagebox.showerror("Export impossible", str(error), parent=self)
             return
         self.status.set(f"Patch IPS exporté : {Path(destination).name} ({len(patch)} octets) — {report.warnings and 'avertissements : ' + '; '.join(report.warnings) or 'aucun avertissement'}")
+
+    def export_pc_package(self) -> None:
+        if not self.project:
+            messagebox.showinfo(APP_TITLE, "Ouvrez d’abord un ROM ou un projet.", parent=self)
+            return
+        destination = filedialog.askdirectory(
+            title="Dossier de destination du package PC",
+            parent=self,
+        )
+        if not destination:
+            return
+        try:
+            folder, report = build_pc_package(self.project, Path(destination) / "Arcana-PC")
+        except RomError as error:
+            messagebox.showerror("Package impossible", str(error), parent=self)
+            return
+        warnings = f"\n\nAvertissements :\n" + "\n".join(report.warnings) if report.warnings else ""
+        messagebox.showinfo(
+            "Package PC créé",
+            f"Dossier : {folder}\n\n"
+            "Double-cliquez sur Jouer.bat pour lancer le jeu.\n"
+            "Attention : ce package contient une copie du jeu — ne le partagez qu'avec des propriétaires de l'original."
+            + warnings,
+            parent=self,
+        )
+        self.status.set(f"Package PC créé dans {folder.name}")
 
     def export_rom(self) -> None:
         if not self.project:
