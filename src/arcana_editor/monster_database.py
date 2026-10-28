@@ -49,12 +49,13 @@ class MonsterDatabase(tk.Toplevel):
         header.pack(fill="x")
         tk.Label(header, text="BASE DE DONNÉES", background="#35475a", foreground="#9dd3ff", font=("Segoe UI", 9, "bold")).pack(anchor="w")
         tk.Label(header, text="Monstres", background="#35475a", foreground="#ffffff", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        body = ttk.Panedwindow(self, orient="horizontal")
+        body = ttk.Frame(self)
         body.pack(fill="both", expand=True, padx=10, pady=10)
-        left = ttk.Frame(body, padding=6)
+        left = ttk.Frame(body, padding=6, width=300)
+        left.pack_propagate(False)
+        left.pack(side="left", fill="y")
         right = ttk.Frame(body, padding=8)
-        body.add(left, weight=1)
-        body.add(right, weight=2)
+        right.pack(side="left", fill="both", expand=True)
         ttk.Entry(left, textvariable=self.search).pack(fill="x", pady=(0, 6))
         self.search.trace_add("write", lambda *_: self._refresh_list())
         self.tree = ttk.Treeview(left, columns=("id", "hp", "level"), show="tree headings", selectmode="browse")
@@ -121,10 +122,14 @@ class MonsterDatabase(tk.Toplevel):
             if query and query not in enemy.name.casefold():
                 continue
             self.tree.insert("", "end", iid=enemy.key, text=enemy.name, values=(f"${enemy.enemy_id:02X}", enemy.hp, enemy.level))
+        children = self.tree.get_children()
         target = select_key or self.current_key
         if target and self.tree.exists(target):
             self.tree.selection_set(target)
             self.tree.see(target)
+        elif children:
+            self.tree.selection_set(children[0])
+            self.tree.see(children[0])
 
     def _select_enemy(self, _: object = None) -> None:
         selection = self.tree.selection()

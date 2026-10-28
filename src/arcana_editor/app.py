@@ -18,7 +18,7 @@ from .rendering import event_kind, is_walkable, tile_details, tile_style
 from .rom import ArcanaRom, MAP_HEIGHT, MAP_WIDTH, RomError
 
 APP_TITLE = "Arcana Map Studio"
-APP_VERSION = "0.9.1"
+APP_VERSION = "0.9.2"
 PALETTE = (
     (0x00, "Mur / vide"), (0x10, "Rencontre A"), (0x11, "Rencontre B"),
     (0x20, "Rencontre fréquente"), (0x30, "Sol sûr"), (0x40, "Escalier A"),
