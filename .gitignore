@@ -1,0 +1,11 @@
+Arcana (USA).sfc
+*.sfc
+*.smc
+*.arcana.json
+/build/
+/dist/
+*.spec
+/.pytest_cache/
+**/__pycache__/
+*.egg-info/
+/extracted/
