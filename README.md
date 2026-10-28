@@ -52,6 +52,7 @@ Version `0.9` provides:
 - reconstruction and relocation of the 5 encounter group tables in bank `$18`;
 - a monster database with per-enemy stats: HP, EXP, GP, level, STR/INT/END/ALERT, race, element, attack animation, equipped defenses and spell;
 - monster image loading (PNG/GIF) with in-editor preview, stored in the project for the future SNES tile conversion;
+- import of the 79 original monster sprites: palettes, RLE-decompressed 4bpp tiles and OAM frame layouts are decoded so every enemy shows its actual card portrait (0.9.1);
 - injection of the 79 enemy names and stat tables into bank `$05`;
 - capacity report and warnings about data that is not injected yet;
 - a standalone Windows executable built with PyInstaller.

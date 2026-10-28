@@ -7,6 +7,7 @@ from typing import Callable
 
 from .enemies import ELEMENTS, RACES, Enemy
 from .project import ArcanaProject
+from .sprites import build_enemy_tile_buffer, enemy_sprite_rgb
 
 STAT_FIELDS = (
     ("hp", "PV"), ("level", "Niveau"), ("strength", "Force"), ("intelligence", "Intelligence"),
@@ -29,6 +30,8 @@ class MonsterDatabase(tk.Toplevel):
         self.enemy_id = tk.IntVar(value=0)
         self.sprite_b64 = ""
         self.sprite_image: tk.PhotoImage | None = None
+        self._tile_buffer: dict | None = None
+        self._rom_sprite = False
         self.stats = {key: tk.IntVar(value=0) for key, _ in STAT_FIELDS}
         self.combat = {key: tk.IntVar(value=0) for key, _ in COMBAT_FIELDS}
         self.race = tk.StringVar(value=RACES[0])
@@ -92,13 +95,13 @@ class MonsterDatabase(tk.Toplevel):
         ttk.Spinbox(general, from_=0, to=255, textvariable=self.enemy_id, width=8).grid(row=3, column=0, sticky="w", pady=(2, 8))
         sprite_box = ttk.LabelFrame(general, text="Image du monstre", padding=10)
         sprite_box.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=(6, 0))
-        self.sprite_label = tk.Label(sprite_box, text="Aucune image", background="#1c2733", foreground="#9dd3ff", width=24, height=8)
+        self.sprite_label = tk.Label(sprite_box, text="Aucune image", background="#1c2733", foreground="#9dd3ff", width=220, height=180)
         self.sprite_label.pack(fill="both", expand=True)
         sprite_buttons = ttk.Frame(sprite_box)
         sprite_buttons.pack(fill="x", pady=(8, 0))
         ttk.Button(sprite_buttons, text="Charger une image…", command=self._load_sprite).pack(side="left", fill="x", expand=True)
         ttk.Button(sprite_buttons, text="Retirer", command=self._clear_sprite).pack(side="left", padx=(4, 0))
-        ttk.Label(general, text="PNG ou GIF. Conservée dans le projet ; la conversion en tiles SNES est prévue pour une version ultérieure.", wraplength=360, justify="left").grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        ttk.Label(general, text="Le sprite du ROM est affiché par défaut. Chargez un PNG ou GIF pour le remplacer dans le projet ; la conversion en tiles SNES est prévue pour une version ultérieure.", wraplength=360, justify="left").grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
         general.columnconfigure(0, weight=1)
         for row, (key, label) in enumerate(STAT_FIELDS):
             ttk.Label(stats, text=label).grid(row=row, column=0, sticky="w", pady=5)
@@ -145,13 +148,27 @@ class MonsterDatabase(tk.Toplevel):
 
     def _set_sprite(self, sprite_b64: str) -> None:
         self.sprite_b64 = sprite_b64
+        self.sprite_image = None
         if sprite_b64:
             try:
                 self.sprite_image = tk.PhotoImage(data=sprite_b64)
             except tk.TclError:
                 self.sprite_image = None
-        else:
-            self.sprite_image = None
+        if self.sprite_image is None and self.current_key is not None:
+            try:
+                enemy_id = int(self.enemy_id.get())
+            except (ValueError, tk.TclError):
+                enemy_id = -1
+            if 0 <= enemy_id < len(self.project.rom.enemies):
+                if self._tile_buffer is None:
+                    self._tile_buffer = build_enemy_tile_buffer(self.project.rom.data)
+                ppm = enemy_sprite_rgb(self.project.rom.data, enemy_id, shared=self._tile_buffer)
+                if ppm:
+                    try:
+                        self.sprite_image = tk.PhotoImage(data=ppm, format="PPM").zoom(2)
+                        self._rom_sprite = True
+                    except tk.TclError:
+                        self.sprite_image = None
         if self.sprite_image:
             self.sprite_label.configure(image=self.sprite_image, text="")
         else:
